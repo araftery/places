@@ -1,26 +1,138 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Base palette — warm editorial cartography */
+  --color-ink: #1a1612;
+  --color-ink-light: #3d3630;
+  --color-ink-muted: #6b5f54;
+  --color-parchment: #faf6f1;
+  --color-parchment-dark: #f0e9df;
+  --color-cream: #f5efe6;
+  --color-sidebar-bg: #1e1b18;
+  --color-sidebar-surface: #2a2520;
+  --color-sidebar-border: #3d3630;
+  --color-sidebar-text: #e8dfd4;
+  --color-sidebar-muted: #9b8e80;
+  --color-amber: #c47d2e;
+  --color-amber-light: #e5a84b;
+  --color-amber-dim: rgba(196, 125, 46, 0.15);
+  --color-terracotta: #b5543b;
+  --color-sage: #5a7a5e;
+  --color-sage-light: #7a9e7e;
+  --color-slate-blue: #5b7b9a;
+  --color-muted-rose: #9a6b6b;
+
+  /* Status colors */
+  --color-status-want: #5b7b9a;
+  --color-status-been: #5a7a5e;
+  --color-status-archived: #8a7e72;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(26, 22, 18, 0.08), 0 1px 2px rgba(26, 22, 18, 0.06);
+  --shadow-card-hover: 0 4px 12px rgba(26, 22, 18, 0.12), 0 2px 4px rgba(26, 22, 18, 0.08);
+  --shadow-overlay: 0 12px 40px rgba(26, 22, 18, 0.2), 0 4px 12px rgba(26, 22, 18, 0.1);
+  --shadow-float: 0 8px 24px rgba(26, 22, 18, 0.15);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--color-parchment);
+  --color-foreground: var(--color-ink);
+  --font-display: var(--font-libre-baskerville);
+  --font-sans: var(--font-dm-sans);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Noise / grain texture overlay for depth */
+@property --grain-opacity {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0.03;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-parchment);
+  color: var(--color-ink);
+  font-family: var(--font-dm-sans, "DM Sans", sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Grain texture utility */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  z-index: 1;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-sidebar-border);
+  border-radius: 2px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-sidebar-muted);
+}
+
+/* Light scrollbar for parchment backgrounds */
+.parchment-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.parchment-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.parchment-scroll::-webkit-scrollbar-thumb {
+  background: #d4c9bb;
+  border-radius: 2px;
+}
+
+/* Mapbox popup override to match aesthetic */
+.mapboxgl-popup-content {
+  background: var(--color-parchment) !important;
+  border-radius: 8px !important;
+  padding: 12px 14px !important;
+  box-shadow: var(--shadow-float) !important;
+  border: 1px solid #e0d6ca !important;
+  font-family: var(--font-dm-sans, "DM Sans", sans-serif) !important;
+}
+.mapboxgl-popup-tip {
+  border-top-color: var(--color-parchment) !important;
+}
+.mapboxgl-popup-close-button {
+  color: var(--color-ink-muted) !important;
+  font-size: 16px !important;
+  padding: 4px 8px !important;
+}
+
+/* Stagger animation for list items */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-slide-in {
+  animation: fadeSlideIn 0.25s ease-out both;
+}
+
+/* Subtle pulse for loading states */
+@keyframes warmPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+.animate-warm-pulse {
+  animation: warmPulse 1.8s ease-in-out infinite;
 }

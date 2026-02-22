@@ -1,65 +1,308 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
+import Sidebar, {
+  Filters,
+  DEFAULT_FILTERS,
+  applyFilters,
+} from "@/components/Sidebar";
+import PlaceDetail from "@/components/PlaceDetail";
+import AddPlaceModal from "@/components/AddPlaceModal";
+import IsochroneControl, {
+  IsochroneSettings,
+} from "@/components/IsochroneControl";
+import MobileBottomSheet from "@/components/MobileBottomSheet";
+import { Place, Tag } from "@/lib/types";
+
+const Map = dynamic(() => import("@/components/Map"), { ssr: false });
+
+function isPointInPolygon(
+  lat: number,
+  lng: number,
+  polygon: number[][]
+): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][1],
+      yi = polygon[i][0];
+    const xj = polygon[j][1],
+      yj = polygon[j][0];
+    const intersect =
+      yi > lng !== yj > lng && lat < ((xj - xi) * (lng - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function isPlaceInIsochrone(
+  place: Place,
+  geoJson: GeoJSON.FeatureCollection
+): boolean {
+  for (const feature of geoJson.features) {
+    if (feature.geometry.type === "Polygon") {
+      const coords = feature.geometry.coordinates[0] as number[][];
+      if (isPointInPolygon(place.lat, place.lng, coords)) return true;
+    }
+  }
+  return false;
+}
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [loading, setLoading] = useState(true);
+
+  // Isochrone state
+  const [isoSettings, setIsoSettings] = useState<IsochroneSettings>({
+    active: false,
+    lat: null,
+    lng: null,
+    mode: "walking",
+    minutes: 15,
+  });
+  const [isoGeoJson, setIsoGeoJson] =
+    useState<GeoJSON.FeatureCollection | null>(null);
+  const [isoLoading, setIsoLoading] = useState(false);
+
+  const fetchPlaces = useCallback(async () => {
+    const res = await fetch("/api/places");
+    const data = await res.json();
+    setPlaces(data);
+  }, []);
+
+  const fetchTags = useCallback(async () => {
+    const res = await fetch("/api/tags");
+    const data = await res.json();
+    setTags(data);
+  }, []);
+
+  useEffect(() => {
+    Promise.all([fetchPlaces(), fetchTags()]).finally(() => setLoading(false));
+  }, [fetchPlaces, fetchTags]);
+
+  const filteredPlaces = useMemo(() => {
+    let result = applyFilters(places, filters);
+    if (isoGeoJson) {
+      result = result.filter((p) => isPlaceInIsochrone(p, isoGeoJson));
+    }
+    return result;
+  }, [places, filters, isoGeoJson]);
+
+  function handleSelectPlace(place: Place | null) {
+    setSelectedPlace(place);
+    setShowDetail(!!place);
+  }
+
+  function handleUpdatePlace(updated: Place) {
+    setPlaces((prev) =>
+      prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+    );
+    setSelectedPlace((prev) =>
+      prev?.id === updated.id ? { ...prev, ...updated } : prev
+    );
+  }
+
+  function handleDeletePlace(id: number) {
+    setPlaces((prev) => prev.filter((p) => p.id !== id));
+    setSelectedPlace(null);
+    setShowDetail(false);
+  }
+
+  async function handleCreateTag(name: string): Promise<Tag> {
+    const res = await fetch("/api/tags", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const tag = await res.json();
+    setTags((prev) => [...prev, tag]);
+    return tag;
+  }
+
+  function handleMapClick(lat: number, lng: number) {
+    if (isoSettings.active) {
+      setIsoSettings((prev) => ({ ...prev, lat, lng }));
+      setIsoGeoJson(null);
+    }
+  }
+
+  async function fetchIsochrone() {
+    if (!isoSettings.lat || !isoSettings.lng) return;
+    setIsoLoading(true);
+    try {
+      const res = await fetch("/api/isochrone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: isoSettings.lat,
+          lng: isoSettings.lng,
+          mode: isoSettings.mode,
+          minutes: isoSettings.minutes,
+        }),
+      });
+      const data = await res.json();
+      setIsoGeoJson(data);
+    } finally {
+      setIsoLoading(false);
+    }
+  }
+
+  function clearIsochrone() {
+    setIsoGeoJson(null);
+    setIsoSettings((prev) => ({ ...prev, lat: null, lng: null }));
+  }
+
+  function useMyLocation() {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsoSettings((prev) => ({
+          ...prev,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        }));
+      },
+      () => alert("Could not get your location")
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[var(--color-parchment)]">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 rounded-full border-2 border-[var(--color-amber)] border-t-transparent animate-spin" />
+          <p
+            className="text-sm text-[var(--color-ink-muted)]"
+            style={{ fontFamily: "var(--font-libre-baskerville)" }}
+          >
+            Loading your places...
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      {/* Sidebar */}
+      <div className="hidden w-[360px] shrink-0 md:block">
+        <Sidebar
+          places={places}
+          tags={tags}
+          selectedPlace={selectedPlace}
+          onSelectPlace={handleSelectPlace}
+          onOpenAdd={() => setShowAddModal(true)}
+          filters={filters}
+          onFiltersChange={setFilters}
+        />
+      </div>
+
+      {/* Map */}
+      <div className="relative flex-1">
+        <Map
+          places={filteredPlaces}
+          selectedPlace={selectedPlace}
+          onSelectPlace={handleSelectPlace}
+          onMapClick={handleMapClick}
+          isochroneGeoJson={isoGeoJson}
+          isochroneOrigin={
+            isoSettings.lat && isoSettings.lng
+              ? { lat: isoSettings.lat, lng: isoSettings.lng }
+              : null
+          }
+        />
+
+        {/* Isochrone controls */}
+        <div className="absolute left-3 top-3 z-10">
+          <IsochroneControl
+            settings={isoSettings}
+            onChange={setIsoSettings}
+            loading={isoLoading}
+            onFetch={fetchIsochrone}
+            onClear={clearIsochrone}
+            onUseLocation={useMyLocation}
+          />
         </div>
-      </main>
+
+        {/* Mobile: Add FAB */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="absolute bottom-6 right-6 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-amber)] text-xl text-white shadow-lg transition-transform hover:scale-105 hover:bg-[var(--color-amber-light)] active:scale-95 md:hidden"
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Place Detail Slide-over */}
+      {showDetail && selectedPlace && (
+        <div className="hidden w-[380px] shrink-0 md:block">
+          <PlaceDetail
+            place={selectedPlace}
+            onClose={() => {
+              setShowDetail(false);
+              setSelectedPlace(null);
+            }}
+            onUpdate={handleUpdatePlace}
+            onDelete={handleDeletePlace}
+          />
+        </div>
+      )}
+
+      {/* Mobile: Place list bottom sheet */}
+      {!showDetail && (
+        <MobileBottomSheet
+          places={filteredPlaces}
+          tags={tags}
+          selectedPlace={selectedPlace}
+          onSelectPlace={handleSelectPlace}
+          onOpenAdd={() => setShowAddModal(true)}
+          filters={filters}
+          onFiltersChange={setFilters}
+        />
+      )}
+
+      {/* Mobile: Place detail bottom sheet */}
+      {showDetail && selectedPlace && (
+        <div className="fixed inset-x-0 bottom-0 z-40 max-h-[70vh] overflow-y-auto rounded-t-2xl bg-[var(--color-parchment)] shadow-xl md:hidden parchment-scroll">
+          <div className="flex justify-center py-2">
+            <div className="h-1 w-10 rounded-full bg-[#d4c9bb]" />
+          </div>
+          <PlaceDetail
+            place={selectedPlace}
+            onClose={() => {
+              setShowDetail(false);
+              setSelectedPlace(null);
+            }}
+            onUpdate={handleUpdatePlace}
+            onDelete={handleDeletePlace}
+          />
+        </div>
+      )}
+
+      {/* Add Place Modal */}
+      <AddPlaceModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSave={fetchPlaces}
+        tags={tags}
+        existingPlaces={places}
+        onCreateTag={handleCreateTag}
+      />
     </div>
   );
 }

@@ -1,0 +1,442 @@
+"use client";
+
+import { Place, Tag, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
+import PlaceCard from "./PlaceCard";
+import { useState, useMemo } from "react";
+
+interface SidebarProps {
+  places: Place[];
+  tags: Tag[];
+  selectedPlace: Place | null;
+  onSelectPlace: (place: Place | null) => void;
+  onOpenAdd: () => void;
+  filters: Filters;
+  onFiltersChange: (filters: Filters) => void;
+}
+
+export interface Filters {
+  search: string;
+  status: string[];
+  tagIds: number[];
+  placeTypes: string[];
+  city: string;
+  neighborhood: string;
+  cuisine: string;
+  priceRange: number[];
+}
+
+export const DEFAULT_FILTERS: Filters = {
+  search: "",
+  status: ["want_to_try", "been_there"],
+  tagIds: [],
+  placeTypes: [],
+  city: "",
+  neighborhood: "",
+  cuisine: "",
+  priceRange: [],
+};
+
+export function applyFilters(places: Place[], filters: Filters): Place[] {
+  return places.filter((p) => {
+    if (
+      filters.search &&
+      !p.name.toLowerCase().includes(filters.search.toLowerCase())
+    )
+      return false;
+
+    if (filters.status.length > 0 && !filters.status.includes(p.status))
+      return false;
+
+    if (filters.tagIds.length > 0) {
+      const placeTagIds = p.tags.map((t) => t.id);
+      if (!filters.tagIds.some((id) => placeTagIds.includes(id))) return false;
+    }
+
+    if (
+      filters.placeTypes.length > 0 &&
+      (!p.placeType || !filters.placeTypes.includes(p.placeType))
+    )
+      return false;
+
+    if (
+      filters.city &&
+      (!p.city || !p.city.toLowerCase().includes(filters.city.toLowerCase()))
+    )
+      return false;
+
+    if (
+      filters.neighborhood &&
+      (!p.neighborhood ||
+        !p.neighborhood
+          .toLowerCase()
+          .includes(filters.neighborhood.toLowerCase()))
+    )
+      return false;
+
+    if (filters.cuisine) {
+      const searchCuisine = filters.cuisine.toLowerCase();
+      if (
+        !p.cuisineType ||
+        !p.cuisineType.some((c) => c.toLowerCase().includes(searchCuisine))
+      )
+        return false;
+    }
+
+    if (
+      filters.priceRange.length > 0 &&
+      (!p.priceRange || !filters.priceRange.includes(p.priceRange))
+    )
+      return false;
+
+    return true;
+  });
+}
+
+export default function Sidebar({
+  places,
+  tags,
+  selectedPlace,
+  onSelectPlace,
+  onOpenAdd,
+  filters,
+  onFiltersChange,
+}: SidebarProps) {
+  const [showFilters, setShowFilters] = useState(false);
+
+  const filteredPlaces = useMemo(
+    () => applyFilters(places, filters),
+    [places, filters]
+  );
+
+  const cities = useMemo(() => {
+    const set = new Set(places.map((p) => p.city).filter(Boolean) as string[]);
+    return Array.from(set).sort();
+  }, [places]);
+
+  const neighborhoods = useMemo(() => {
+    const set = new Set(
+      places.map((p) => p.neighborhood).filter(Boolean) as string[]
+    );
+    return Array.from(set).sort();
+  }, [places]);
+
+  const activeFilterCount =
+    filters.status.length +
+    filters.tagIds.length +
+    filters.placeTypes.length +
+    (filters.city ? 1 : 0) +
+    (filters.neighborhood ? 1 : 0) +
+    (filters.cuisine ? 1 : 0) +
+    filters.priceRange.length;
+
+  return (
+    <div className="relative flex h-full flex-col bg-[var(--color-sidebar-bg)] grain">
+      {/* Header */}
+      <div className="relative z-10 border-b border-[var(--color-sidebar-border)] px-5 pb-4 pt-5">
+        <div className="flex items-center justify-between">
+          <h1
+            className="text-xl tracking-tight text-[var(--color-sidebar-text)]"
+            style={{ fontFamily: "var(--font-libre-baskerville)" }}
+          >
+            Places
+          </h1>
+          <button
+            onClick={onOpenAdd}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-amber)] px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-amber-light)]"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative mt-3">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-sidebar-muted)]"
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            value={filters.search}
+            onChange={(e) =>
+              onFiltersChange({ ...filters, search: e.target.value })
+            }
+            className="block w-full rounded-lg border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] py-2 pl-9 pr-3 text-sm text-[var(--color-sidebar-text)] placeholder-[var(--color-sidebar-muted)] transition-colors focus:border-[var(--color-amber)] focus:outline-none"
+            placeholder="Search places..."
+          />
+        </div>
+
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="mt-3 flex items-center gap-1.5 text-sm text-[var(--color-sidebar-muted)] transition-colors hover:text-[var(--color-sidebar-text)]"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="8" y1="12" x2="20" y2="12" />
+            <line x1="12" y1="18" x2="20" y2="18" />
+          </svg>
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="rounded-full bg-[var(--color-amber)] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Filters Panel */}
+      {showFilters && (
+        <div className="relative z-10 space-y-3 border-b border-[var(--color-sidebar-border)] px-5 py-4">
+          {/* Status */}
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+              Status
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {STATUS_OPTIONS.map((s) => {
+                const active = filters.status.includes(s.value);
+                return (
+                  <button
+                    key={s.value}
+                    onClick={() =>
+                      onFiltersChange({
+                        ...filters,
+                        status: active
+                          ? filters.status.filter((v) => v !== s.value)
+                          : [...filters.status, s.value],
+                      })
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                      active
+                        ? "bg-[var(--color-amber)] text-white"
+                        : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tags */}
+          {tags.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                Tags
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map((tag) => {
+                  const active = filters.tagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          tagIds: active
+                            ? filters.tagIds.filter((id) => id !== tag.id)
+                            : [...filters.tagIds, tag.id],
+                        })
+                      }
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                        active
+                          ? "text-white"
+                          : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                      }`}
+                      style={active ? { backgroundColor: tag.color } : {}}
+                    >
+                      {tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Type */}
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+              Type
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {PLACE_TYPES.map((t) => {
+                const active = filters.placeTypes.includes(t.value);
+                return (
+                  <button
+                    key={t.value}
+                    onClick={() =>
+                      onFiltersChange({
+                        ...filters,
+                        placeTypes: active
+                          ? filters.placeTypes.filter((v) => v !== t.value)
+                          : [...filters.placeTypes, t.value],
+                      })
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                      active
+                        ? "bg-[var(--color-amber)] text-white"
+                        : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* City & Neighborhood */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                City
+              </p>
+              <select
+                value={filters.city}
+                onChange={(e) =>
+                  onFiltersChange({ ...filters, city: e.target.value })
+                }
+                className="block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2 py-1.5 text-xs text-[var(--color-sidebar-text)]"
+              >
+                <option value="">All</option>
+                {cities.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                Neighborhood
+              </p>
+              <select
+                value={filters.neighborhood}
+                onChange={(e) =>
+                  onFiltersChange({ ...filters, neighborhood: e.target.value })
+                }
+                className="block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2 py-1.5 text-xs text-[var(--color-sidebar-text)]"
+              >
+                <option value="">All</option>
+                {neighborhoods.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Price Range */}
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+              Price Range
+            </p>
+            <div className="flex gap-1.5">
+              {[1, 2, 3, 4].map((p) => {
+                const active = filters.priceRange.includes(p);
+                return (
+                  <button
+                    key={p}
+                    onClick={() =>
+                      onFiltersChange({
+                        ...filters,
+                        priceRange: active
+                          ? filters.priceRange.filter((v) => v !== p)
+                          : [...filters.priceRange, p],
+                      })
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                      active
+                        ? "bg-[var(--color-amber)] text-white"
+                        : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                    }`}
+                  >
+                    {"$".repeat(p)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cuisine */}
+          <div>
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+              Cuisine
+            </p>
+            <input
+              value={filters.cuisine}
+              onChange={(e) =>
+                onFiltersChange({ ...filters, cuisine: e.target.value })
+              }
+              className="block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2.5 py-1.5 text-xs text-[var(--color-sidebar-text)] placeholder-[var(--color-sidebar-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+              placeholder="e.g. Italian"
+            />
+          </div>
+
+          <button
+            onClick={() => onFiltersChange(DEFAULT_FILTERS)}
+            className="text-xs text-[var(--color-amber)] hover:text-[var(--color-amber-light)]"
+          >
+            Clear all filters
+          </button>
+        </div>
+      )}
+
+      {/* Place List */}
+      <div className="relative z-10 flex-1 overflow-y-auto px-4 py-3 sidebar-scroll">
+        <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+          {filteredPlaces.length} place{filteredPlaces.length !== 1 ? "s" : ""}
+        </p>
+        <div className="space-y-2">
+          {filteredPlaces.map((place, i) => (
+            <div
+              key={place.id}
+              className="animate-fade-slide-in"
+              style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
+            >
+              <PlaceCard
+                place={place}
+                isSelected={selectedPlace?.id === place.id}
+                onClick={() => onSelectPlace(place)}
+              />
+            </div>
+          ))}
+          {filteredPlaces.length === 0 && (
+            <p className="py-12 text-center text-sm text-[var(--color-sidebar-muted)]">
+              No places found
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
