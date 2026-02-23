@@ -24,6 +24,7 @@ export interface Filters {
   neighborhood: string;
   cuisine: string;
   priceRange: number[];
+  openNow: boolean;
 }
 
 export const DEFAULT_FILTERS: Filters = {
@@ -35,7 +36,53 @@ export const DEFAULT_FILTERS: Filters = {
   neighborhood: "",
   cuisine: "",
   priceRange: [],
+  openNow: false,
 };
+
+interface HoursPeriod {
+  open: { day: number; hour: number; minute: number };
+  close?: { day: number; hour: number; minute: number };
+}
+
+interface HoursData {
+  periods?: HoursPeriod[];
+}
+
+function isPlaceOpenNow(place: Place): boolean | null {
+  const hours = place.hoursJson as HoursData | null | undefined;
+  if (!hours?.periods || hours.periods.length === 0) return null;
+
+  const now = new Date();
+  // Google Places API uses Sunday=0, same as JS getDay()
+  const day = now.getDay();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const nowMinutes = day * 24 * 60 + hour * 60 + minute;
+
+  for (const period of hours.periods) {
+    if (!period.open) continue;
+
+    // A period with open but no close means open 24/7
+    if (!period.close) return true;
+
+    const openMinutes =
+      period.open.day * 24 * 60 + period.open.hour * 60 + period.open.minute;
+    const closeMinutes =
+      period.close.day * 24 * 60 +
+      period.close.hour * 60 +
+      period.close.minute;
+
+    if (closeMinutes > openMinutes) {
+      // Normal case: open and close on the same day or later in the week
+      if (nowMinutes >= openMinutes && nowMinutes < closeMinutes) return true;
+    } else {
+      // Wraps around the week boundary (e.g., Saturday night → Sunday morning)
+      if (nowMinutes >= openMinutes || nowMinutes < closeMinutes) return true;
+    }
+  }
+
+  return false;
+}
 
 export function applyFilters(places: Place[], filters: Filters): Place[] {
   return places.filter((p) => {
@@ -89,6 +136,12 @@ export function applyFilters(places: Place[], filters: Filters): Place[] {
     )
       return false;
 
+    if (filters.openNow) {
+      const openStatus = isPlaceOpenNow(p);
+      // null means unknown hours — keep visible per requirements
+      if (openStatus === false) return false;
+    }
+
     return true;
   });
 }
@@ -129,7 +182,8 @@ export default function Sidebar({
     (filters.city ? 1 : 0) +
     (filters.neighborhood ? 1 : 0) +
     (filters.cuisine ? 1 : 0) +
-    filters.priceRange.length;
+    filters.priceRange.length +
+    (filters.openNow ? 1 : 0);
 
   return (
     <div className="relative flex h-full flex-col bg-[var(--color-sidebar-bg)] grain">
@@ -246,6 +300,22 @@ export default function Sidebar({
                 );
               })}
             </div>
+          </div>
+
+          {/* Open Now */}
+          <div>
+            <button
+              onClick={() =>
+                onFiltersChange({ ...filters, openNow: !filters.openNow })
+              }
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                filters.openNow
+                  ? "bg-[var(--color-amber)] text-white"
+                  : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+              }`}
+            >
+              Open Now
+            </button>
           </div>
 
           {/* Tags */}
