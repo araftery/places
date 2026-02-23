@@ -13,6 +13,7 @@ interface MobileBottomSheetProps {
   onOpenAdd: () => void;
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
+  onManageTags: () => void;
 }
 
 export default function MobileBottomSheet({
@@ -23,6 +24,7 @@ export default function MobileBottomSheet({
   onOpenAdd,
   filters,
   onFiltersChange,
+  onManageTags,
 }: MobileBottomSheetProps) {
   const [expanded, setExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -127,6 +129,19 @@ export default function MobileBottomSheet({
               </button>
             ))}
           </div>
+          {tags.length > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                Tags
+              </p>
+              <button
+                onClick={onManageTags}
+                className="text-[11px] font-medium text-[var(--color-amber)]"
+              >
+                Manage
+              </button>
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (
               <button
