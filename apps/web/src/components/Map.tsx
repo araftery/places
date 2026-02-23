@@ -35,6 +35,7 @@ interface MapProps {
   travelTimes?: Map<number, TravelTimeBand>;
   flyTo?: { lat: number; lng: number } | null;
   previewPin?: { lat: number; lng: number; name: string } | null;
+  showDetail?: boolean;
 }
 
 export default function Map({
@@ -47,18 +48,32 @@ export default function Map({
   travelTimes,
   flyTo,
   previewPin,
+  showDetail,
 }: MapProps) {
   const mapRef = useRef<MapRef>(null);
 
   useEffect(() => {
     if (flyTo && mapRef.current) {
+      const isMobile = window.innerWidth < 768;
       mapRef.current.flyTo({
         center: [flyTo.lng, flyTo.lat],
         zoom: 14,
         duration: 1500,
+        // On mobile, pad the bottom so the pin lands above the detail sheet
+        ...(isMobile && { padding: { top: 0, bottom: Math.round(window.innerHeight * 0.5), left: 0, right: 0 } }),
       });
     }
   }, [flyTo]);
+
+  // Reset map padding when detail sheet closes on mobile
+  useEffect(() => {
+    if (!showDetail && mapRef.current && window.innerWidth < 768) {
+      mapRef.current.easeTo({
+        padding: { top: 0, bottom: 0, left: 0, right: 0 },
+        duration: 300,
+      });
+    }
+  }, [showDetail]);
 
   const handleClick = useCallback(
     (e: mapboxgl.MapLayerMouseEvent) => {

@@ -366,6 +366,7 @@ export default function Home() {
           travelTimes={travelTimes}
           flyTo={flyTo}
           previewPin={previewPin}
+          showDetail={showDetail}
         />
 
         {/* Isochrone controls */}
