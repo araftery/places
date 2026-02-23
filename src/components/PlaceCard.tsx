@@ -42,15 +42,22 @@ export default function PlaceCard({
       }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <h3
-          className={`text-sm font-semibold leading-tight ${
-            isSelected
-              ? "text-[var(--color-amber-light)]"
-              : "text-[var(--color-sidebar-text)]"
-          }`}
-        >
-          {place.name}
-        </h3>
+        <div className="min-w-0 flex-1">
+          <h3
+            className={`text-sm font-semibold leading-tight ${
+              isSelected
+                ? "text-[var(--color-amber-light)]"
+                : "text-[var(--color-sidebar-text)]"
+            }`}
+          >
+            {place.name}
+          </h3>
+          {place.closedPermanently && (
+            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-terracotta)]">
+              Permanently Closed
+            </p>
+          )}
+        </div>
         <span
           className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
             STATUS_STYLES[place.status] || ""

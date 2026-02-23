@@ -21,6 +21,10 @@ export interface GooglePlaceResult {
     }>;
     weekdayDescriptions: string[];
   };
+  businessStatus?:
+    | "OPERATIONAL"
+    | "CLOSED_TEMPORARILY"
+    | "CLOSED_PERMANENTLY";
   rating?: number;
   userRatingCount?: number;
   primaryType?: string;
@@ -113,6 +117,7 @@ export async function getPlaceDetails(
     "nationalPhoneNumber",
     "priceLevel",
     "regularOpeningHours",
+    "businessStatus",
     "rating",
     "userRatingCount",
     "primaryType",

@@ -34,6 +34,8 @@ export interface Place {
   googlePlaceId: string | null;
   hoursJson: unknown;
   hoursLastFetched: string | null;
+  closedPermanently: boolean;
+  businessStatusCheckedAt: string | null;
   createdAt: string;
   updatedAt: string;
   tags: Tag[];

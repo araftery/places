@@ -2,6 +2,7 @@
 
 import { Place, Tag, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
+import ReviewBanner from "./ReviewBanner";
 import { useState, useMemo } from "react";
 import type { TravelTimeBand } from "@/app/page";
 
@@ -15,6 +16,10 @@ interface SidebarProps {
   onFiltersChange: (filters: Filters) => void;
   onManageTags: () => void;
   travelTimes?: Map<number, TravelTimeBand>;
+  reviewClosed?: Place[];
+  reviewStale?: Place[];
+  onReviewArchive?: (id: number) => void;
+  onReviewDismissClosed?: (id: number) => void;
 }
 
 export interface Filters {
@@ -158,6 +163,10 @@ export default function Sidebar({
   onFiltersChange,
   onManageTags,
   travelTimes,
+  reviewClosed = [],
+  reviewStale = [],
+  onReviewArchive,
+  onReviewDismissClosed,
 }: SidebarProps) {
   const [showFilters, setShowFilters] = useState(false);
 
@@ -492,6 +501,17 @@ export default function Sidebar({
             Clear all filters
           </button>
         </div>
+      )}
+
+      {/* Review Banner */}
+      {onReviewArchive && onReviewDismissClosed && (
+        <ReviewBanner
+          closedPlaces={reviewClosed}
+          stalePlaces={reviewStale}
+          onArchive={onReviewArchive}
+          onDismissClosed={onReviewDismissClosed}
+          onSelectPlace={onSelectPlace}
+        />
       )}
 
       {/* Place List */}

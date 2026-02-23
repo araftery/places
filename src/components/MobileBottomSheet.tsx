@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Place, Tag, PLACE_TYPES, STATUS_OPTIONS } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
+import ReviewBanner from "./ReviewBanner";
 import { Filters, DEFAULT_FILTERS, applyFilters } from "./Sidebar";
 import type { TravelTimeBand } from "@/app/page";
 
@@ -16,6 +17,10 @@ interface MobileBottomSheetProps {
   onFiltersChange: (filters: Filters) => void;
   onManageTags: () => void;
   travelTimes?: Map<number, TravelTimeBand>;
+  reviewClosed?: Place[];
+  reviewStale?: Place[];
+  onReviewArchive?: (id: number) => void;
+  onReviewDismissClosed?: (id: number) => void;
 }
 
 export default function MobileBottomSheet({
@@ -28,6 +33,10 @@ export default function MobileBottomSheet({
   onFiltersChange,
   onManageTags,
   travelTimes,
+  reviewClosed = [],
+  reviewStale = [],
+  onReviewArchive,
+  onReviewDismissClosed,
 }: MobileBottomSheetProps) {
   const [expanded, setExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -217,6 +226,17 @@ export default function MobileBottomSheet({
             Clear filters
           </button>
         </div>
+      )}
+
+      {/* Review Banner */}
+      {onReviewArchive && onReviewDismissClosed && (
+        <ReviewBanner
+          closedPlaces={reviewClosed}
+          stalePlaces={reviewStale}
+          onArchive={onReviewArchive}
+          onDismissClosed={onReviewDismissClosed}
+          onSelectPlace={onSelectPlace}
+        />
       )}
 
       {/* Place list */}

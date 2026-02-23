@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/refresh-hours",
       "schedule": "0 6 * * 0"
+    },
+    {
+      "path": "/api/cron/check-closed",
+      "schedule": "0 7 1 * *"
     }
   ]
 }

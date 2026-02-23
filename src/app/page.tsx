@@ -96,6 +96,10 @@ export default function Home() {
     useState<GeoJSON.FeatureCollection | null>(null);
   const [isoLoading, setIsoLoading] = useState(false);
 
+  // Review state: places needing attention (closed or stale)
+  const [reviewClosed, setReviewClosed] = useState<Place[]>([]);
+  const [reviewStale, setReviewStale] = useState<Place[]>([]);
+
   const fetchPlaces = useCallback(async () => {
     const res = await fetch("/api/places");
     const data = await res.json();
@@ -108,9 +112,22 @@ export default function Home() {
     setTags(data);
   }, []);
 
+  const fetchReview = useCallback(async () => {
+    try {
+      const res = await fetch("/api/places/needs-review");
+      const data = await res.json();
+      setReviewClosed(data.closed || []);
+      setReviewStale(data.stale || []);
+    } catch {
+      // Silently fail — review banner is non-critical
+    }
+  }, []);
+
   useEffect(() => {
-    Promise.all([fetchPlaces(), fetchTags()]).finally(() => setLoading(false));
-  }, [fetchPlaces, fetchTags]);
+    Promise.all([fetchPlaces(), fetchTags(), fetchReview()]).finally(() =>
+      setLoading(false)
+    );
+  }, [fetchPlaces, fetchTags, fetchReview]);
 
   const filteredPlaces = useMemo(() => {
     let result = applyFilters(places, filters);
@@ -198,6 +215,34 @@ export default function Home() {
     }));
   }
 
+  async function handleReviewArchive(id: number) {
+    await fetch("/api/places", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "archived" }),
+    });
+    setPlaces((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status: "archived" } : p))
+    );
+    setReviewClosed((prev) => prev.filter((p) => p.id !== id));
+    setReviewStale((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function handleReviewDismissClosed(id: number) {
+    // Clear the closedPermanently flag so it doesn't show up again
+    fetch("/api/places", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, closedPermanently: false }),
+    });
+    setPlaces((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, closedPermanently: false } : p
+      )
+    );
+    setReviewClosed((prev) => prev.filter((p) => p.id !== id));
+  }
+
   function handleMapClick(lat: number, lng: number) {
     if (isoSettings.active) {
       setIsoSettings((prev) => ({ ...prev, lat, lng }));
@@ -274,6 +319,10 @@ export default function Home() {
           onFiltersChange={setFilters}
           onManageTags={() => setShowManageTags(true)}
           travelTimes={travelTimes}
+          reviewClosed={reviewClosed}
+          reviewStale={reviewStale}
+          onReviewArchive={handleReviewArchive}
+          onReviewDismissClosed={handleReviewDismissClosed}
         />
       </div>
 
@@ -355,6 +404,10 @@ export default function Home() {
           onFiltersChange={setFilters}
           onManageTags={() => setShowManageTags(true)}
           travelTimes={travelTimes}
+          reviewClosed={reviewClosed}
+          reviewStale={reviewStale}
+          onReviewArchive={handleReviewArchive}
+          onReviewDismissClosed={handleReviewDismissClosed}
         />
       )}
 

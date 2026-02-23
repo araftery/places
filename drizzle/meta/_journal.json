@@ -8,6 +8,13 @@
       "when": 1771798616787,
       "tag": "0000_sharp_slapstick",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771817766224,
+      "tag": "0001_young_shaman",
+      "breakpoints": true
     }
   ]
 }

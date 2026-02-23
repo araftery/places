@@ -152,6 +152,18 @@ export default function PlaceDetail({
       </div>
 
       <div className="flex-1 space-y-5 px-5 py-5">
+        {/* Closed warning */}
+        {place.closedPermanently && (
+          <div className="rounded-lg border border-[var(--color-terracotta)]/30 bg-[var(--color-terracotta)]/5 px-3.5 py-2.5">
+            <p className="text-xs font-semibold text-[var(--color-terracotta)]">
+              Permanently Closed
+            </p>
+            <p className="mt-0.5 text-[11px] text-[var(--color-ink-muted)]">
+              Google reports this place has permanently closed. Consider archiving it.
+            </p>
+          </div>
+        )}
+
         {/* Address */}
         {place.address && (
           <div>

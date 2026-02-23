@@ -8,6 +8,7 @@ import {
   jsonb,
   primaryKey,
   integer,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 export const places = pgTable("places", {
@@ -30,6 +31,8 @@ export const places = pgTable("places", {
   googlePlaceId: text("google_place_id").unique(),
   hoursJson: jsonb("hours_json"),
   hoursLastFetched: timestamp("hours_last_fetched"),
+  closedPermanently: boolean("closed_permanently").default(false).notNull(),
+  businessStatusCheckedAt: timestamp("business_status_checked_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
