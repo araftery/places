@@ -74,23 +74,23 @@ export default function Map({
       <NavigationControl position="top-right" />
       <GeolocateControl position="top-right" />
 
-      {/* Isochrone polygon */}
+      {/* Isochrone polygons — multi-step with data-driven colors */}
       {isochroneGeoJson && (
         <Source id="isochrone" type="geojson" data={isochroneGeoJson}>
           <Layer
             id="isochrone-fill"
             type="fill"
             paint={{
-              "fill-color": "#c47d2e",
-              "fill-opacity": 0.1,
+              "fill-color": ["get", "color"],
+              "fill-opacity": 0.15,
             }}
           />
           <Layer
             id="isochrone-outline"
             type="line"
             paint={{
-              "line-color": "#c47d2e",
-              "line-width": 2,
+              "line-color": ["get", "color"],
+              "line-width": 1.5,
               "line-opacity": 0.5,
               "line-dasharray": [3, 2],
             }}

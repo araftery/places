@@ -7,7 +7,17 @@ export interface IsochroneSettings {
   lat: number | null;
   lng: number | null;
   mode: "walking" | "public_transport" | "driving";
-  minutes: number;
+}
+
+export const TIME_STEPS: Record<string, number[]> = {
+  walking: [10, 20, 30],
+  public_transport: [15, 30, 45],
+  driving: [15, 30, 45],
+};
+
+function getRingColors(steps: number[]): { minutes: number; color: string }[] {
+  const palette = ["#b5543b", "#c47d2e", "#5a7a5e"];
+  return steps.map((m, i) => ({ minutes: m, color: palette[i] }));
 }
 
 interface IsochroneControlProps {
@@ -17,6 +27,7 @@ interface IsochroneControlProps {
   onFetch: () => void;
   onClear: () => void;
   onUseLocation: () => void;
+  hasIsochrone: boolean;
 }
 
 const MODES = [
@@ -25,8 +36,6 @@ const MODES = [
   { value: "driving", label: "Drive", icon: "\u{1F697}" },
 ] as const;
 
-const TIME_OPTIONS = [5, 10, 15, 20, 30];
-
 export default function IsochroneControl({
   settings,
   onChange,
@@ -34,8 +43,12 @@ export default function IsochroneControl({
   onFetch,
   onClear,
   onUseLocation,
+  hasIsochrone,
 }: IsochroneControlProps) {
   const [expanded, setExpanded] = useState(false);
+
+  const steps = TIME_STEPS[settings.mode];
+  const rings = getRingColors(steps);
 
   if (!expanded) {
     return (
@@ -89,7 +102,6 @@ export default function IsochroneControl({
               lat: null,
               lng: null,
               mode: "walking",
-              minutes: 15,
             });
           }}
           className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
@@ -132,22 +144,22 @@ export default function IsochroneControl({
             ))}
           </div>
 
-          {/* Time */}
-          <div className="mt-2 flex gap-1">
-            {TIME_OPTIONS.map((t) => (
-              <button
-                key={t}
-                onClick={() => onChange({ ...settings, minutes: t })}
-                className={`flex-1 rounded-md px-1 py-1.5 text-xs font-medium transition-all ${
-                  settings.minutes === t
-                    ? "bg-[var(--color-amber)] text-white"
-                    : "border border-[#d4c9bb] bg-[var(--color-cream)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-                }`}
-              >
-                {t}m
-              </button>
-            ))}
-          </div>
+          {/* Color legend */}
+          {hasIsochrone && (
+            <div className="mt-2.5 flex items-center justify-between rounded-md border border-[#e0d6ca] bg-[var(--color-cream)] px-2.5 py-2">
+              {rings.map((ring) => (
+                <div key={ring.minutes} className="flex items-center gap-1.5">
+                  <div
+                    className="h-2.5 w-2.5 rounded-sm"
+                    style={{ backgroundColor: ring.color, opacity: 0.7 }}
+                  />
+                  <span className="text-[10px] font-medium text-[var(--color-ink-muted)]">
+                    {ring.minutes} min
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <button
             onClick={onFetch}

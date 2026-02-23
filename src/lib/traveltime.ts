@@ -5,32 +5,31 @@ const BASE_URL = "https://api.traveltimeapp.com/v4";
 export type TransportMode = "walking" | "public_transport" | "driving";
 
 export interface IsochroneResult {
+  search_id: string;
   shapes: Array<{
     shell: Array<{ lat: number; lng: number }>;
     holes: Array<Array<{ lat: number; lng: number }>>;
   }>;
 }
 
-export async function getIsochrone(
+export async function getIsochrones(
   lat: number,
   lng: number,
   mode: TransportMode,
-  travelTimeMinutes: number
-): Promise<IsochroneResult> {
+  minutesList: number[]
+): Promise<IsochroneResult[]> {
   const departureTime = new Date().toISOString();
 
   const body = {
-    departure_searches: [
-      {
-        id: "isochrone",
-        coords: { lat, lng },
-        departure_time: departureTime,
-        travel_time: travelTimeMinutes * 60,
-        transportation: {
-          type: mode === "public_transport" ? "public_transport" : mode,
-        },
+    departure_searches: minutesList.map((minutes) => ({
+      id: `iso-${minutes}`,
+      coords: { lat, lng },
+      departure_time: departureTime,
+      travel_time: minutes * 60,
+      transportation: {
+        type: mode === "public_transport" ? "public_transport" : mode,
       },
-    ],
+    })),
   };
 
   const res = await fetch(`${BASE_URL}/time-map`, {
@@ -49,5 +48,5 @@ export async function getIsochrone(
   }
 
   const data = await res.json();
-  return data.results[0];
+  return data.results;
 }

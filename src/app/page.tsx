@@ -11,6 +11,7 @@ import PlaceDetail from "@/components/PlaceDetail";
 import AddPlaceModal from "@/components/AddPlaceModal";
 import IsochroneControl, {
   IsochroneSettings,
+  TIME_STEPS,
 } from "@/components/IsochroneControl";
 import MobileBottomSheet from "@/components/MobileBottomSheet";
 import { Place, Tag } from "@/lib/types";
@@ -63,7 +64,6 @@ export default function Home() {
     lat: null,
     lng: null,
     mode: "walking",
-    minutes: 15,
   });
   const [isoGeoJson, setIsoGeoJson] =
     useState<GeoJSON.FeatureCollection | null>(null);
@@ -142,7 +142,7 @@ export default function Home() {
           lat: isoSettings.lat,
           lng: isoSettings.lng,
           mode: isoSettings.mode,
-          minutes: isoSettings.minutes,
+          minutesList: TIME_STEPS[isoSettings.mode],
         }),
       });
       const data = await res.json();
@@ -225,6 +225,7 @@ export default function Home() {
             onFetch={fetchIsochrone}
             onClear={clearIsochrone}
             onUseLocation={useMyLocation}
+            hasIsochrone={!!isoGeoJson}
           />
         </div>
 
