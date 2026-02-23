@@ -17,7 +17,7 @@ import IsochroneControl, {
 import MobileBottomSheet from "@/components/MobileBottomSheet";
 import { Place, Tag } from "@/lib/types";
 
-const Map = dynamic(() => import("@/components/Map"), { ssr: false });
+const MapView = dynamic(() => import("@/components/Map"), { ssr: false });
 
 function isPointInPolygon(
   lat: number,
@@ -48,6 +48,31 @@ function isPlaceInIsochrone(
     }
   }
   return false;
+}
+
+export interface TravelTimeBand {
+  minutes: number;
+  color: string;
+}
+
+function getTravelTimeBand(
+  place: Place,
+  geoJson: GeoJSON.FeatureCollection
+): TravelTimeBand | null {
+  let best: TravelTimeBand | null = null;
+  for (const feature of geoJson.features) {
+    const props = feature.properties as { minutes: number; color: string } | null;
+    if (!props) continue;
+    if (feature.geometry.type === "Polygon") {
+      const coords = feature.geometry.coordinates[0] as number[][];
+      if (isPointInPolygon(place.lat, place.lng, coords)) {
+        if (!best || props.minutes < best.minutes) {
+          best = { minutes: props.minutes, color: props.color };
+        }
+      }
+    }
+  }
+  return best;
 }
 
 export default function Home() {
@@ -94,6 +119,16 @@ export default function Home() {
     }
     return result;
   }, [places, filters, isoGeoJson]);
+
+  const travelTimes = useMemo(() => {
+    const map = new Map<number, TravelTimeBand>();
+    if (!isoGeoJson) return map;
+    for (const place of filteredPlaces) {
+      const band = getTravelTimeBand(place, isoGeoJson);
+      if (band) map.set(place.id, band);
+    }
+    return map;
+  }, [filteredPlaces, isoGeoJson]);
 
   function handleSelectPlace(place: Place | null) {
     setSelectedPlace(place);
@@ -238,12 +273,13 @@ export default function Home() {
           filters={filters}
           onFiltersChange={setFilters}
           onManageTags={() => setShowManageTags(true)}
+          travelTimes={travelTimes}
         />
       </div>
 
       {/* Map */}
       <div className="relative flex-1">
-        <Map
+        <MapView
           places={filteredPlaces}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
@@ -254,6 +290,7 @@ export default function Home() {
               ? { lat: isoSettings.lat, lng: isoSettings.lng }
               : null
           }
+          travelTimes={travelTimes}
         />
 
         {/* Isochrone controls */}
@@ -317,6 +354,7 @@ export default function Home() {
           filters={filters}
           onFiltersChange={setFilters}
           onManageTags={() => setShowManageTags(true)}
+          travelTimes={travelTimes}
         />
       )}
 
