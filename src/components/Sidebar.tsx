@@ -12,6 +12,7 @@ interface SidebarProps {
   onOpenAdd: () => void;
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
+  onManageTags: () => void;
 }
 
 export interface Filters {
@@ -100,6 +101,7 @@ export default function Sidebar({
   onOpenAdd,
   filters,
   onFiltersChange,
+  onManageTags,
 }: SidebarProps) {
   const [showFilters, setShowFilters] = useState(false);
 
@@ -249,9 +251,17 @@ export default function Sidebar({
           {/* Tags */}
           {tags.length > 0 && (
             <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-                Tags
-              </p>
+              <div className="mb-1.5 flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                  Tags
+                </p>
+                <button
+                  onClick={onManageTags}
+                  className="text-[11px] font-medium text-[var(--color-amber)] transition-colors hover:text-[var(--color-amber-light)]"
+                >
+                  Manage
+                </button>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {tags.map((tag) => {
                   const active = filters.tagIds.includes(tag.id);

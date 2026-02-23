@@ -9,6 +9,7 @@ import Sidebar, {
 } from "@/components/Sidebar";
 import PlaceDetail from "@/components/PlaceDetail";
 import AddPlaceModal from "@/components/AddPlaceModal";
+import ManageTagsModal from "@/components/ManageTagsModal";
 import IsochroneControl, {
   IsochroneSettings,
   TIME_STEPS,
@@ -55,6 +56,7 @@ export default function Home() {
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showManageTags, setShowManageTags] = useState(false);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [loading, setLoading] = useState(true);
 
@@ -122,6 +124,43 @@ export default function Home() {
     const tag = await res.json();
     setTags((prev) => [...prev, tag]);
     return tag;
+  }
+
+  async function handleUpdateTag(
+    id: number,
+    data: { name?: string; color?: string }
+  ) {
+    const res = await fetch("/api/tags", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...data }),
+    });
+    const updated = await res.json();
+    setTags((prev) => prev.map((t) => (t.id === id ? updated : t)));
+    // Update tags embedded in places
+    setPlaces((prev) =>
+      prev.map((p) => ({
+        ...p,
+        tags: p.tags.map((t) => (t.id === id ? updated : t)),
+      }))
+    );
+  }
+
+  async function handleDeleteTag(id: number) {
+    await fetch(`/api/tags?id=${id}`, { method: "DELETE" });
+    setTags((prev) => prev.filter((t) => t.id !== id));
+    // Remove deleted tag from places
+    setPlaces((prev) =>
+      prev.map((p) => ({
+        ...p,
+        tags: p.tags.filter((t) => t.id !== id),
+      }))
+    );
+    // Remove from active filters
+    setFilters((prev) => ({
+      ...prev,
+      tagIds: prev.tagIds.filter((tid) => tid !== id),
+    }));
   }
 
   function handleMapClick(lat: number, lng: number) {
@@ -198,6 +237,7 @@ export default function Home() {
           onOpenAdd={() => setShowAddModal(true)}
           filters={filters}
           onFiltersChange={setFilters}
+          onManageTags={() => setShowManageTags(true)}
         />
       </div>
 
@@ -274,6 +314,7 @@ export default function Home() {
           onOpenAdd={() => setShowAddModal(true)}
           filters={filters}
           onFiltersChange={setFilters}
+          onManageTags={() => setShowManageTags(true)}
         />
       )}
 
@@ -303,6 +344,15 @@ export default function Home() {
         tags={tags}
         existingPlaces={places}
         onCreateTag={handleCreateTag}
+      />
+
+      {/* Manage Tags Modal */}
+      <ManageTagsModal
+        open={showManageTags}
+        onClose={() => setShowManageTags(false)}
+        tags={tags}
+        onUpdateTag={handleUpdateTag}
+        onDeleteTag={handleDeleteTag}
       />
     </div>
   );
