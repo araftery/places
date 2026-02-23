@@ -60,12 +60,14 @@ export default function MobileBottomSheet({
             Filters
             {filters.status.length +
               filters.tagIds.length +
-              filters.placeTypes.length >
+              filters.placeTypes.length +
+              (filters.openNow ? 1 : 0) >
               0 && (
               <span className="rounded bg-[var(--color-amber)] px-1 text-[10px] font-bold text-white">
                 {filters.status.length +
                   filters.tagIds.length +
-                  filters.placeTypes.length}
+                  filters.placeTypes.length +
+                  (filters.openNow ? 1 : 0)}
               </span>
             )}
           </button>
@@ -126,6 +128,20 @@ export default function MobileBottomSheet({
                 {s.label}
               </button>
             ))}
+          </div>
+          <div>
+            <button
+              onClick={() =>
+                onFiltersChange({ ...filters, openNow: !filters.openNow })
+              }
+              className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                filters.openNow
+                  ? "bg-[var(--color-amber)] text-white"
+                  : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)]"
+              }`}
+            >
+              Open Now
+            </button>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (
