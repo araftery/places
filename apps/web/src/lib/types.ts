@@ -8,6 +8,7 @@ export interface PlaceRating {
   id: number;
   placeId: number;
   source: string;
+  externalId: string | null;
   rating: string | null;
   notes: string | null;
   ratingUrl: string | null;
