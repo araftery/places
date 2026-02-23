@@ -3,6 +3,7 @@
 import { Place, Tag, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 import { useState, useMemo } from "react";
+import type { TravelTimeBand } from "@/app/page";
 
 interface SidebarProps {
   places: Place[];
@@ -13,6 +14,7 @@ interface SidebarProps {
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
   onManageTags: () => void;
+  travelTimes?: Map<number, TravelTimeBand>;
 }
 
 export interface Filters {
@@ -155,6 +157,7 @@ export default function Sidebar({
   filters,
   onFiltersChange,
   onManageTags,
+  travelTimes,
 }: SidebarProps) {
   const [showFilters, setShowFilters] = useState(false);
 
@@ -507,6 +510,7 @@ export default function Sidebar({
                 place={place}
                 isSelected={selectedPlace?.id === place.id}
                 onClick={() => onSelectPlace(place)}
+                travelTime={travelTimes?.get(place.id)}
               />
             </div>
           ))}

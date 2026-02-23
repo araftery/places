@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Place, Tag, PLACE_TYPES, STATUS_OPTIONS } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 import { Filters, DEFAULT_FILTERS, applyFilters } from "./Sidebar";
+import type { TravelTimeBand } from "@/app/page";
 
 interface MobileBottomSheetProps {
   places: Place[];
@@ -14,6 +15,7 @@ interface MobileBottomSheetProps {
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
   onManageTags: () => void;
+  travelTimes?: Map<number, TravelTimeBand>;
 }
 
 export default function MobileBottomSheet({
@@ -25,6 +27,7 @@ export default function MobileBottomSheet({
   filters,
   onFiltersChange,
   onManageTags,
+  travelTimes,
 }: MobileBottomSheetProps) {
   const [expanded, setExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -225,6 +228,7 @@ export default function MobileBottomSheet({
               place={place}
               isSelected={selectedPlace?.id === place.id}
               onClick={() => onSelectPlace(place)}
+              travelTime={travelTimes?.get(place.id)}
             />
           ))}
         </div>

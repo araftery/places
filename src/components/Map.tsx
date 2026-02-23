@@ -12,6 +12,7 @@ import MapGL, {
 } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Place } from "@/lib/types";
+import type { TravelTimeBand } from "@/app/page";
 
 const STATUS_COLORS: Record<string, string> = {
   want_to_try: "#5b7b9a",
@@ -37,6 +38,7 @@ interface MapProps {
   onMapClick?: (lat: number, lng: number) => void;
   isochroneGeoJson?: GeoJSON.FeatureCollection | null;
   isochroneOrigin?: { lat: number; lng: number } | null;
+  travelTimes?: Map<number, TravelTimeBand>;
 }
 
 export default function Map({
@@ -46,6 +48,7 @@ export default function Map({
   onMapClick,
   isochroneGeoJson,
   isochroneOrigin,
+  travelTimes,
 }: MapProps) {
   const mapRef = useRef<MapRef>(null);
 
@@ -187,6 +190,14 @@ export default function Map({
             {selectedPlace.neighborhood && (
               <p className="mt-0.5 text-[11px] text-[var(--color-ink-muted)]">
                 {selectedPlace.neighborhood}
+              </p>
+            )}
+            {travelTimes?.get(selectedPlace.id) && (
+              <p
+                className="mt-1 text-[11px] font-semibold"
+                style={{ color: travelTimes.get(selectedPlace.id)!.color }}
+              >
+                &lt; {travelTimes.get(selectedPlace.id)!.minutes} min
               </p>
             )}
           </div>
