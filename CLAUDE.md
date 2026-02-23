@@ -2,6 +2,8 @@
 
 Personal web app for tracking recommended and favorite places (restaurants, bars, cafes, etc.) across cities. Map-first, mobile-friendly.
 
+./KEY_USE_CASES.md lists the key use cases of the app
+
 ## Monorepo Structure
 
 pnpm workspace monorepo:
