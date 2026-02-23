@@ -1,6 +1,6 @@
 "use client";
 
-import { Place, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
 import { generateReviewLinks } from "@/lib/review-links";
 import { useState } from "react";
 
@@ -11,6 +11,8 @@ interface PlaceDetailProps {
   onClose: () => void;
   onUpdate: (place: Place) => void;
   onDelete: (id: number) => void;
+  tags: Tag[];
+  onCreateTag: (name: string) => Promise<Tag>;
 }
 
 export default function PlaceDetail({
@@ -18,11 +20,17 @@ export default function PlaceDetail({
   onClose,
   onUpdate,
   onDelete,
+  tags,
+  onCreateTag,
 }: PlaceDetailProps) {
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState(place.status);
   const [notes, setNotes] = useState(place.personalNotes || "");
   const [source, setSource] = useState(place.source || "");
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>(
+    place.tags.map((t) => t.id)
+  );
+  const [newTagName, setNewTagName] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Manual rating entry
@@ -49,6 +57,13 @@ export default function PlaceDetail({
           .weekdayDescriptions
       : null;
 
+  async function handleAddTag() {
+    if (!newTagName.trim()) return;
+    const tag = await onCreateTag(newTagName.trim());
+    setSelectedTagIds((prev) => [...prev, tag.id]);
+    setNewTagName("");
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -60,10 +75,12 @@ export default function PlaceDetail({
           status,
           personalNotes: notes || null,
           source: source || null,
+          tagIds: selectedTagIds,
         }),
       });
       const updated = await res.json();
-      onUpdate({ ...place, ...updated });
+      const updatedTags = tags.filter((t) => selectedTagIds.includes(t.id));
+      onUpdate({ ...place, ...updated, tags: updatedTags });
       setEditing(false);
     } finally {
       setSaving(false);
@@ -301,23 +318,79 @@ export default function PlaceDetail({
         </div>
 
         {/* Tags */}
-        {place.tags.length > 0 && (
+        {editing ? (
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
               Tags
             </p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {place.tags.map((tag) => (
-                <span
+              {tags.map((tag) => (
+                <button
                   key={tag.id}
-                  className="rounded px-2 py-0.5 text-[11px] font-semibold text-white/90"
-                  style={{ backgroundColor: tag.color }}
+                  type="button"
+                  onClick={() =>
+                    setSelectedTagIds((prev) =>
+                      prev.includes(tag.id)
+                        ? prev.filter((id) => id !== tag.id)
+                        : [...prev, tag.id]
+                    )
+                  }
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                    selectedTagIds.includes(tag.id)
+                      ? "text-white"
+                      : "border border-[#d4c9bb] bg-[var(--color-cream)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                  }`}
+                  style={
+                    selectedTagIds.includes(tag.id)
+                      ? { backgroundColor: tag.color }
+                      : {}
+                  }
                 >
                   {tag.name}
-                </span>
+                </button>
               ))}
             </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddTag();
+                  }
+                }}
+                className="flex-1 rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                placeholder="New tag..."
+              />
+              <button
+                onClick={handleAddTag}
+                type="button"
+                className="rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
+              >
+                Add
+              </button>
+            </div>
           </div>
+        ) : (
+          place.tags.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                Tags
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {place.tags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="rounded px-2 py-0.5 text-[11px] font-semibold text-white/90"
+                    style={{ backgroundColor: tag.color }}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )
         )}
 
         {/* Hours */}
@@ -388,7 +461,11 @@ export default function PlaceDetail({
                   {saving ? "Saving..." : "Save"}
                 </button>
                 <button
-                  onClick={() => setEditing(false)}
+                  onClick={() => {
+                    setSelectedTagIds(place.tags.map((t) => t.id));
+                    setNewTagName("");
+                    setEditing(false);
+                  }}
                   className="rounded-md border border-[#d4c9bb] px-4 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment-dark)]"
                 >
                   Cancel
@@ -488,7 +565,14 @@ export default function PlaceDetail({
         <div className="flex gap-2">
           {!editing && (
             <button
-              onClick={() => setEditing(true)}
+              onClick={() => {
+                setStatus(place.status);
+                setNotes(place.personalNotes || "");
+                setSource(place.source || "");
+                setSelectedTagIds(place.tags.map((t) => t.id));
+                setNewTagName("");
+                setEditing(true);
+              }}
               className="flex-1 rounded-md bg-[var(--color-cream)] px-3 py-2 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-parchment-dark)]"
             >
               Edit
