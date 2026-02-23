@@ -300,6 +300,8 @@ export default function Home() {
             }}
             onUpdate={handleUpdatePlace}
             onDelete={handleDeletePlace}
+            tags={tags}
+            onCreateTag={handleCreateTag}
           />
         </div>
       )}
@@ -332,6 +334,8 @@ export default function Home() {
             }}
             onUpdate={handleUpdatePlace}
             onDelete={handleDeletePlace}
+            tags={tags}
+            onCreateTag={handleCreateTag}
           />
         </div>
       )}
