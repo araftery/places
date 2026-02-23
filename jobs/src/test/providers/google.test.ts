@@ -60,9 +60,12 @@ describe("scrapeGoogle", () => {
       externalId: "ChIJ123",
       ratingData: {
         source: "google",
-        rating: "4.5/5",
-        notes: "120 reviews",
+        rating: 4.5,
+        ratingMax: 5,
+        notes: null,
+        reviewCount: 120,
         ratingUrl: null,
+        reviewDate: null,
         externalId: "ChIJ123",
       },
       placeData: {

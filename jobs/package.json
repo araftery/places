@@ -13,7 +13,7 @@
   "dependencies": {
     "@places/clients": "workspace:*",
     "@places/db": "workspace:*",
-    "@trigger.dev/sdk": "^4.0.0",
+    "@trigger.dev/sdk": "4.4.1",
     "drizzle-orm": "^0.45.1"
   },
   "devDependencies": {

@@ -84,7 +84,7 @@ export async function scrapeInfatuation(
       cuisines: details.cuisines,
     });
 
-    const rating = details.rating != null ? `${details.rating}/10` : null;
+    const rating = details.rating ?? null;
     const isCriticsPick = !!details.isCriticsPick;
 
     span.setAttribute("found", true);
@@ -98,8 +98,11 @@ export async function scrapeInfatuation(
       ratingData: {
         source: "infatuation",
         rating,
+        ratingMax: 10,
         notes: isCriticsPick ? "Critic's Pick" : null,
+        reviewCount: null,
         ratingUrl: details.url,
+        reviewDate: details.reviewDate ?? null,
         externalId: slug,
       },
       placeData: null,

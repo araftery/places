@@ -8,9 +8,12 @@ export interface ScrapeResult {
   externalId: string | null;
   ratingData: {
     source: string;
-    rating: string | null;
+    rating: number | null;
+    ratingMax: number | null;
     notes: string | null;
+    reviewCount: number | null;
     ratingUrl: string | null;
+    reviewDate: string | null;
     externalId: string | null;
   } | null;
   placeData: Record<string, unknown> | null;
@@ -20,9 +23,12 @@ export async function upsertRating(
   placeId: number,
   data: {
     source: string;
-    rating: string | null;
+    rating: number | null;
+    ratingMax: number | null;
     notes: string | null;
+    reviewCount: number | null;
     ratingUrl: string | null;
+    reviewDate: string | null;
     externalId: string | null;
   }
 ) {
@@ -41,15 +47,20 @@ export async function upsertRating(
     const prev = existing[0];
     const changed =
       prev.rating !== data.rating ||
+      prev.ratingMax !== data.ratingMax ||
       prev.notes !== data.notes ||
+      prev.reviewCount !== data.reviewCount ||
       prev.ratingUrl !== data.ratingUrl;
 
     await db
       .update(placeRatings)
       .set({
         rating: data.rating,
+        ratingMax: data.ratingMax,
         notes: data.notes,
+        reviewCount: data.reviewCount,
         ratingUrl: data.ratingUrl,
+        reviewDate: data.reviewDate ? new Date(data.reviewDate) : null,
         externalId: data.externalId,
         lastFetched: new Date(),
       })
@@ -67,8 +78,11 @@ export async function upsertRating(
       placeId,
       source: data.source,
       rating: data.rating,
+      ratingMax: data.ratingMax,
       notes: data.notes,
+      reviewCount: data.reviewCount,
       ratingUrl: data.ratingUrl,
+      reviewDate: data.reviewDate ? new Date(data.reviewDate) : null,
       externalId: data.externalId,
       lastFetched: new Date(),
     });

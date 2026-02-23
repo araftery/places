@@ -109,13 +109,14 @@ export function createNytClient(config?: NytClientConfig) {
         name: reviewItem.name,
         summary: reviewItem.shortSummary || null,
         rating: reviewItem.rating ?? null,
-        ratingScale: "0-3",
+        ratingScale: "0-4",
         priceLevel: PRICE_MAP[reviewItem.priceCategory || ""] ?? null,
         cuisines,
         lat: null,
         lng: null,
         neighborhood,
         url: node.url,
+        reviewDate: node.firstPublished || null,
       };
     });
   }
@@ -177,7 +178,7 @@ export function createNytClient(config?: NytClientConfig) {
       name: reviewItem.name,
       summary: reviewItem.shortSummary || null,
       rating: reviewItem.rating ?? null,
-      ratingScale: "0-3",
+      ratingScale: "0-4",
       priceLevel: PRICE_MAP[reviewItem.priceCategory || ""] ?? null,
       cuisines,
       lat: null,

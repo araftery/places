@@ -50,9 +50,12 @@ describe("scrapeNyt", () => {
       externalId: "nyt-123",
       ratingData: {
         source: "nyt",
-        rating: "2/3",
+        rating: 2,
+        ratingMax: 4,
         notes: "A great spot",
+        reviewCount: null,
         ratingUrl: "https://nytimes.com/review",
+        reviewDate: null,
         externalId: "nyt-123",
       },
       placeData: null,
@@ -115,6 +118,6 @@ describe("scrapeNyt", () => {
     const result = await scrapeNyt(place);
 
     expect(result.externalId).toBe("first");
-    expect(result.ratingData!.rating).toBe("3/3");
+    expect(result.ratingData!.rating).toBe(3);
   });
 });

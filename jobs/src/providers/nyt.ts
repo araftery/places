@@ -53,7 +53,7 @@ export async function scrapeNyt(
 
     // Take the first result
     const best = results[0];
-    const rating = best.rating != null ? `${best.rating}/3` : null;
+    const rating = best.rating || null; // treat 0 as null (unrated)
 
     span.setAttribute("found", true);
     span.setAttribute("matchedExternalId", best.externalId);
@@ -66,8 +66,11 @@ export async function scrapeNyt(
       ratingData: {
         source: "nyt",
         rating,
+        ratingMax: 4,
         notes: best.summary,
+        reviewCount: null,
         ratingUrl: best.url,
+        reviewDate: best.reviewDate ?? null,
         externalId: best.externalId,
       },
       placeData: null,

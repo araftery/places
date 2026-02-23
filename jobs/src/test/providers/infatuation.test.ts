@@ -59,9 +59,12 @@ describe("scrapeInfatuation", () => {
       externalId: "test-restaurant-nyc",
       ratingData: {
         source: "infatuation",
-        rating: "8/10",
+        rating: 8,
+        ratingMax: 10,
         notes: null,
+        reviewCount: null,
         ratingUrl: "https://theinfatuation.com/r",
+        reviewDate: null,
         externalId: "test-restaurant-nyc",
       },
       placeData: null,

@@ -87,14 +87,13 @@ export async function scrapeBeli(
       cuisines: details.cuisines,
     });
 
-    const rating = details.rating != null ? `${details.rating}/10` : null;
-    const ratingCount = details.ratingCount ?? 0;
-    const notes = ratingCount ? `${ratingCount} ratings` : null;
+    const rating = details.rating ?? null;
+    const reviewCount = details.ratingCount ?? null;
 
     span.setAttribute("found", true);
     span.setAttribute("businessId", businessId);
     span.setAttribute("rating", rating ?? "none");
-    span.setAttribute("ratingCount", ratingCount);
+    span.setAttribute("ratingCount", reviewCount ?? 0);
 
     return {
       found: true,
@@ -102,8 +101,11 @@ export async function scrapeBeli(
       ratingData: {
         source: "beli",
         rating,
-        notes,
+        ratingMax: 10,
+        notes: null,
+        reviewCount,
         ratingUrl: details.url,
+        reviewDate: null,
         externalId: businessId,
       },
       placeData: null,

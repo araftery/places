@@ -18,9 +18,12 @@ export interface PlaceRating {
   placeId: number;
   source: string;
   externalId: string | null;
-  rating: string | null;
+  rating: number | null;
+  ratingMax: number | null;
   notes: string | null;
+  reviewCount: number | null;
   ratingUrl: string | null;
+  reviewDate: string | null;
   lastFetched: string | null;
 }
 

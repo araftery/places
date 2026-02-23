@@ -103,7 +103,7 @@ describe("audit-google task", () => {
     mockScrapeGoogle.mockResolvedValue({
       found: true,
       externalId: "ChIJ123",
-      ratingData: { source: "google", rating: "4.5/5", notes: null, ratingUrl: null, externalId: "ChIJ123" },
+      ratingData: { source: "google", rating: 4.5, ratingMax: 5, notes: null, reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "ChIJ123" },
       placeData: { hoursJson: {}, closedPermanently: false },
     });
 
@@ -151,7 +151,7 @@ describe("audit-google task", () => {
     mockScrapeGoogle.mockResolvedValue({
       found: true,
       externalId: "x",
-      ratingData: { source: "google", rating: "4/5", notes: null, ratingUrl: null, externalId: "x" },
+      ratingData: { source: "google", rating: 4, ratingMax: 5, notes: null, reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "x" },
       placeData: null,
     });
 

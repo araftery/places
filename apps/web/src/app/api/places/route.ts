@@ -74,8 +74,9 @@ export async function POST(request: NextRequest) {
     await db.insert(placeRatings).values({
       placeId: newPlace.id,
       source: "google",
-      rating: `${googleRating}/5`,
-      notes: googleRatingCount ? `${googleRatingCount} reviews` : null,
+      rating: googleRating,
+      ratingMax: 5,
+      reviewCount: googleRatingCount || null,
       lastFetched: new Date(),
     });
   }

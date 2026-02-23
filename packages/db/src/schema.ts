@@ -77,9 +77,12 @@ export const placeRatings = pgTable("place_ratings", {
     .references(() => places.id, { onDelete: "cascade" }),
   source: text("source").notNull(),
   externalId: text("external_id"),
-  rating: text("rating"),
+  rating: real("rating"),
+  ratingMax: real("rating_max"),
   notes: text("notes"),
+  reviewCount: integer("review_count"),
   ratingUrl: text("rating_url"),
+  reviewDate: timestamp("review_date"),
   lastFetched: timestamp("last_fetched"),
 });
 

@@ -60,9 +60,12 @@ describe("scrapeBeli", () => {
       externalId: "beli-123",
       ratingData: {
         source: "beli",
-        rating: "8.5/10",
-        notes: "42 ratings",
+        rating: 8.5,
+        ratingMax: 10,
+        notes: null,
+        reviewCount: 42,
         ratingUrl: "https://beli.com/r",
+        reviewDate: null,
         externalId: "beli-123",
       },
       placeData: null,
@@ -84,7 +87,7 @@ describe("scrapeBeli", () => {
     expect(mockSearch).not.toHaveBeenCalled();
     expect(mockLookup).toHaveBeenCalledWith("existing-beli-id");
     expect(result.externalId).toBe("existing-beli-id");
-    expect(result.ratingData!.rating).toBe("9/10");
+    expect(result.ratingData!.rating).toBe(9.0);
   });
 
   it("returns not found when search returns empty", async () => {

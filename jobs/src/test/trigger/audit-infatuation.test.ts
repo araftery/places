@@ -108,7 +108,7 @@ describe("audit-infatuation task", () => {
     mockScrapeInfatuation.mockResolvedValue({
       found: true,
       externalId: "slug-1",
-      ratingData: { source: "infatuation", rating: "8/10", notes: null, ratingUrl: null, externalId: "slug-1" },
+      ratingData: { source: "infatuation", rating: 8, ratingMax: 10, notes: null, reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "slug-1" },
       placeData: null,
     });
 
@@ -152,7 +152,7 @@ describe("audit-infatuation task", () => {
     mockScrapeInfatuation.mockResolvedValue({
       found: true,
       externalId: "known-slug",
-      ratingData: { source: "infatuation", rating: "7/10", notes: null, ratingUrl: null, externalId: "known-slug" },
+      ratingData: { source: "infatuation", rating: 7, ratingMax: 10, notes: null, reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "known-slug" },
       placeData: null,
     });
 

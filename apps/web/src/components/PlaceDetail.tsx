@@ -1,10 +1,20 @@
 "use client";
 
-import { Place, Tag, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, PlaceRating, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
 import { generateReviewLinks } from "@/lib/review-links";
+import { formatRating, formatCount, getBestBlurb } from "@/lib/format-ratings";
 import { useState } from "react";
 
 const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
+
+const SOURCE_LABELS: Record<string, string> = {
+  google: "Google",
+  nyt: "NYT",
+  infatuation: "Infatuation",
+  beli: "Beli",
+};
+
+const RATING_SOURCE_ORDER = ["google", "nyt", "infatuation", "beli"];
 
 interface PlaceDetailProps {
   place: Place;
@@ -13,6 +23,157 @@ interface PlaceDetailProps {
   onDelete: (id: number) => void;
   tags: Tag[];
   onCreateTag: (name: string) => Promise<Tag>;
+}
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function formatReviewDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
+function RatingsTable({ ratings }: { ratings: PlaceRating[] }) {
+  if (ratings.length === 0) return null;
+
+  return (
+    <div className="mt-1.5 overflow-hidden rounded-lg bg-[var(--color-cream)]">
+      <table className="w-full border-collapse text-sm">
+        <tbody>
+          {ratings.map((r, i) => {
+            const source = r.source;
+            const label = SOURCE_LABELS[source] || source;
+            const reviewDateStr = r.reviewDate ? formatReviewDate(r.reviewDate) : null;
+            const isLast = i === ratings.length - 1;
+
+            let ratingDisplay: React.ReactNode = (
+              <span className="text-[var(--color-ink-muted)]">&mdash;</span>
+            );
+            if (r.rating != null && r.ratingMax != null) {
+              if (source === "nyt") {
+                ratingDisplay = (
+                  <>
+                    {r.rating}
+                    <span className="text-[var(--color-amber)]">{"\u2605"}</span>
+                  </>
+                );
+              } else {
+                ratingDisplay = <>{formatRating(r.rating, r.ratingMax)}</>;
+              }
+            }
+
+            let secondary: string | null = null;
+            if (r.reviewCount != null) {
+              secondary = formatCount(r.reviewCount);
+            } else if (reviewDateStr) {
+              secondary = reviewDateStr;
+            }
+
+            const isPick = source === "infatuation" && r.notes === "Critic's Pick";
+
+            const rowContent = (
+              <>
+                {/* Rating + secondary stacked */}
+                <td className="whitespace-nowrap py-2 pl-3 pr-2">
+                  <div className="text-[13px] font-semibold leading-tight text-[var(--color-ink)]">
+                    {ratingDisplay}
+                  </div>
+                  {secondary && (
+                    <div className="mt-0.5 text-[10px] leading-tight text-[var(--color-ink-muted)]">
+                      {secondary}
+                    </div>
+                  )}
+                </td>
+                {/* Spacer */}
+                <td className="py-2"></td>
+                {/* Provider name — right-aligned */}
+                <td className="whitespace-nowrap py-2 pr-3 text-right text-xs font-medium text-[var(--color-ink-muted)]">
+                  {label}
+                  {isPick && (
+                    <span className="ml-1.5 rounded bg-[var(--color-amber)]/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--color-amber)]">
+                      Pick
+                    </span>
+                  )}
+                </td>
+              </>
+            );
+
+            if (r.ratingUrl) {
+              return (
+                <tr
+                  key={r.id}
+                  className={`cursor-pointer transition-colors hover:bg-[var(--color-parchment)]${isLast ? "" : " border-b border-[#e8e0d5]"}`}
+                  onClick={() => window.open(r.ratingUrl!, "_blank", "noopener,noreferrer")}
+                >
+                  {rowContent}
+                </tr>
+              );
+            }
+
+            return (
+              <tr
+                key={r.id}
+                className={isLast ? "" : "border-b border-[#e8e0d5]"}
+              >
+                {rowContent}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function getTodayHours(
+  weekdayDescriptions: string[]
+): { dayName: string; hours: string } | null {
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const today = dayNames[new Date().getDay()];
+
+  for (const desc of weekdayDescriptions) {
+    const colonIdx = desc.indexOf(": ");
+    if (colonIdx === -1) continue;
+    const day = desc.substring(0, colonIdx);
+    const hours = desc.substring(colonIdx + 2);
+    if (day === today) {
+      return { dayName: day, hours };
+    }
+  }
+  return null;
+}
+
+function parseHoursLine(desc: string): { day: string; hours: string } {
+  const colonIdx = desc.indexOf(": ");
+  if (colonIdx === -1) return { day: desc, hours: "" };
+  return {
+    day: desc.substring(0, colonIdx),
+    hours: desc.substring(colonIdx + 2),
+  };
 }
 
 export default function PlaceDetail({
@@ -33,22 +194,22 @@ export default function PlaceDetail({
   );
   const [newTagName, setNewTagName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [hoursExpanded, setHoursExpanded] = useState(false);
 
   // Manual rating entry
   const [addingRating, setAddingRating] = useState(false);
   const [ratingSource, setRatingSource] = useState("");
   const [ratingValue, setRatingValue] = useState("");
+  const [ratingMaxValue, setRatingMaxValue] = useState("");
   const [ratingNotes, setRatingNotes] = useState("");
   const [ratingUrl, setRatingUrl] = useState("");
 
-  const googleRating = place.ratings?.find((r) => r.source === "google");
-  const otherRatings =
-    place.ratings?.filter((r) => r.source !== "google") || [];
   const reviewLinks = generateReviewLinks(
     place.name,
     place.address,
     place.cityName
   );
+  const blurb = getBestBlurb(place.ratings || []);
 
   const hoursDescriptions =
     place.hoursJson &&
@@ -57,6 +218,45 @@ export default function PlaceDetail({
       ? (place.hoursJson as { weekdayDescriptions: string[] })
           .weekdayDescriptions
       : null;
+
+  const todayHours = hoursDescriptions
+    ? getTodayHours(hoursDescriptions)
+    : null;
+
+  // Compact info line: Type · $$$ · Neighborhood
+  const infoLineParts: string[] = [];
+  if (place.placeType) {
+    const typeLabel =
+      PLACE_TYPES.find((t) => t.value === place.placeType)?.label ||
+      place.placeType;
+    infoLineParts.push(typeLabel);
+  }
+  if (place.priceRange) {
+    infoLineParts.push(PRICE_LABELS[place.priceRange]);
+  }
+  if (place.neighborhood) {
+    infoLineParts.push(place.neighborhood);
+  }
+
+  // Sort ratings in canonical order
+  const sortedRatings = [...(place.ratings || [])].sort((a, b) => {
+    const ai = RATING_SOURCE_ORDER.indexOf(a.source);
+    const bi = RATING_SOURCE_ORDER.indexOf(b.source);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
+
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const todayName = dayNames[new Date().getDay()];
 
   async function handleAddTag() {
     if (!newTagName.trim()) return;
@@ -97,7 +297,8 @@ export default function PlaceDetail({
       body: JSON.stringify({
         placeId: place.id,
         source: ratingSource,
-        rating: ratingValue || null,
+        rating: ratingValue ? parseFloat(ratingValue) : null,
+        ratingMax: ratingMaxValue ? parseFloat(ratingMaxValue) : null,
         notes: ratingNotes || null,
         ratingUrl: ratingUrl || null,
       }),
@@ -111,6 +312,7 @@ export default function PlaceDetail({
       setAddingRating(false);
       setRatingSource("");
       setRatingValue("");
+      setRatingMaxValue("");
       setRatingNotes("");
       setRatingUrl("");
     }
@@ -125,30 +327,42 @@ export default function PlaceDetail({
   return (
     <div className="flex h-full flex-col overflow-y-auto border-l border-[#e0d6ca] bg-[var(--color-parchment)] parchment-scroll">
       {/* Header */}
-      <div className="flex items-start justify-between border-b border-[#e0d6ca] px-5 py-4">
-        <h2
-          className="text-lg leading-snug text-[var(--color-ink)]"
-          style={{ fontFamily: "var(--font-libre-baskerville)" }}
-        >
-          {place.name}
-        </h2>
-        <button
-          onClick={onClose}
-          className="ml-3 shrink-0 rounded-md p-1 text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-parchment-dark)] hover:text-[var(--color-ink)]"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
+      <div className="border-b border-[#e0d6ca] px-5 py-4">
+        <div className="flex items-start justify-between">
+          <h2
+            className="text-lg leading-snug text-[var(--color-ink)]"
+            style={{ fontFamily: "var(--font-libre-baskerville)" }}
           >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+            {place.name}
+          </h2>
+          <button
+            onClick={onClose}
+            className="ml-3 shrink-0 rounded-md p-1 text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-parchment-dark)] hover:text-[var(--color-ink)]"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        {infoLineParts.length > 0 && (
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+            {infoLineParts.join(" \u00b7 ")}
+          </p>
+        )}
+        {place.cuisineType && place.cuisineType.length > 0 && (
+          <p className="mt-0.5 text-sm text-[var(--color-ink-light)]">
+            {place.cuisineType.join(", ")}
+          </p>
+        )}
       </div>
 
       <div className="flex-1 space-y-5 px-5 py-5">
@@ -159,34 +373,39 @@ export default function PlaceDetail({
               Permanently Closed
             </p>
             <p className="mt-0.5 text-[11px] text-[var(--color-ink-muted)]">
-              Google reports this place has permanently closed. Consider archiving it.
+              Google reports this place has permanently closed. Consider
+              archiving it.
             </p>
           </div>
         )}
 
-        {/* Address */}
-        {place.address && (
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-              Address
-            </p>
-            <p className="mt-0.5 text-sm text-[var(--color-ink)]">
-              {place.address}
-            </p>
-          </div>
-        )}
-
-        {/* Info grid */}
-        <div className="flex flex-wrap gap-x-6 gap-y-3">
-          {editing ? (
+        {editing ? (
+          /* ── Edit Mode ── */
+          <div className="space-y-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                Status
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-amber)] focus:outline-none"
+              >
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
                 Type
-              </p>
+              </label>
               <select
                 value={placeType}
                 onChange={(e) => setPlaceType(e.target.value)}
-                className="mt-0.5 rounded-md border border-[#d4c9bb] bg-white px-2 py-1 text-sm text-[var(--color-ink)] focus:border-[var(--color-amber)] focus:outline-none"
+                className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-amber)] focus:outline-none"
               >
                 <option value="">None</option>
                 {PLACE_TYPES.map((t) => (
@@ -196,430 +415,355 @@ export default function PlaceDetail({
                 ))}
               </select>
             </div>
-          ) : (
-            place.placeType && (
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                  Type
-                </p>
-                <p className="mt-0.5 text-sm capitalize text-[var(--color-ink)]">
-                  {PLACE_TYPES.find((t) => t.value === place.placeType)?.label ||
-                    place.placeType}
-                </p>
-              </div>
-            )
-          )}
-          {place.priceRange && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                Price
-              </p>
-              <p className="mt-0.5 text-sm text-[var(--color-ink)]">
-                {PRICE_LABELS[place.priceRange]}
-              </p>
-            </div>
-          )}
-          {place.neighborhood && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                Neighborhood
-              </p>
-              <p className="mt-0.5 text-sm text-[var(--color-ink)]">
-                {place.neighborhood}
-              </p>
-            </div>
-          )}
-          {place.cityName && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                City
-              </p>
-              <p className="mt-0.5 text-sm text-[var(--color-ink)]">
-                {place.cityName}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {place.cuisineType && place.cuisineType.length > 0 && (
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-              Cuisine
-            </p>
-            <p className="mt-0.5 text-sm text-[var(--color-ink)]">
-              {place.cuisineType.join(", ")}
-            </p>
-          </div>
-        )}
-
-        {/* Ratings */}
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-            Ratings
-          </p>
-          <div className="mt-1.5 space-y-1.5">
-            {googleRating && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-semibold text-[var(--color-amber)]">
-                  ★ {googleRating.rating}
-                </span>
-                <span className="text-[var(--color-ink-muted)]">Google</span>
-                {googleRating.notes && (
-                  <span className="text-xs text-[var(--color-ink-muted)]">
-                    ({googleRating.notes})
-                  </span>
-                )}
-              </div>
-            )}
-            {otherRatings.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 text-sm">
-                <span className="font-medium capitalize text-[var(--color-ink)]">
-                  {r.source}
-                </span>
-                {r.rating && (
-                  <span className="text-[var(--color-ink-light)]">
-                    {r.rating}
-                  </span>
-                )}
-                {r.notes && (
-                  <span className="text-xs text-[var(--color-ink-muted)]">
-                    {r.notes}
-                  </span>
-                )}
-                {r.ratingUrl && (
-                  <a
-                    href={r.ratingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-[var(--color-amber)] hover:text-[var(--color-amber-light)]"
-                  >
-                    Link
-                  </a>
-                )}
-              </div>
-            ))}
-
-            {!addingRating ? (
-              <button
-                onClick={() => setAddingRating(true)}
-                className="mt-1 text-xs font-medium text-[var(--color-amber)] hover:text-[var(--color-amber-light)]"
-              >
-                + Add rating
-              </button>
-            ) : (
-              <div className="mt-2 space-y-2 rounded-lg border border-[#e0d6ca] bg-[var(--color-cream)] p-3">
-                <input
-                  value={ratingSource}
-                  onChange={(e) => setRatingSource(e.target.value)}
-                  placeholder="Source (e.g. michelin, nyt)"
-                  className="block w-full rounded-md border border-[#d4c9bb] bg-white px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                />
-                <input
-                  value={ratingValue}
-                  onChange={(e) => setRatingValue(e.target.value)}
-                  placeholder="Rating (e.g. 4.5/5, 1 star)"
-                  className="block w-full rounded-md border border-[#d4c9bb] bg-white px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                />
-                <input
-                  value={ratingNotes}
-                  onChange={(e) => setRatingNotes(e.target.value)}
-                  placeholder="Notes"
-                  className="block w-full rounded-md border border-[#d4c9bb] bg-white px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                />
-                <input
-                  value={ratingUrl}
-                  onChange={(e) => setRatingUrl(e.target.value)}
-                  placeholder="URL to review"
-                  className="block w-full rounded-md border border-[#d4c9bb] bg-white px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                />
-                <div className="flex gap-2">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                Tags
+              </label>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {tags.map((tag) => (
                   <button
-                    onClick={handleAddRating}
-                    className="rounded-md bg-[var(--color-amber)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-amber-light)]"
+                    key={tag.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedTagIds((prev) =>
+                        prev.includes(tag.id)
+                          ? prev.filter((id) => id !== tag.id)
+                          : [...prev, tag.id]
+                      )
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                      selectedTagIds.includes(tag.id)
+                        ? "text-white"
+                        : "border border-[#d4c9bb] bg-[var(--color-cream)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                    }`}
+                    style={
+                      selectedTagIds.includes(tag.id)
+                        ? { backgroundColor: tag.color }
+                        : {}
+                    }
                   >
-                    Save
+                    {tag.name}
                   </button>
-                  <button
-                    onClick={() => setAddingRating(false)}
-                    className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                ))}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Tags */}
-        {editing ? (
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-              Tags
-            </p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {tags.map((tag) => (
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  className="flex-1 rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                  placeholder="New tag..."
+                />
                 <button
-                  key={tag.id}
+                  onClick={handleAddTag}
                   type="button"
-                  onClick={() =>
-                    setSelectedTagIds((prev) =>
-                      prev.includes(tag.id)
-                        ? prev.filter((id) => id !== tag.id)
-                        : [...prev, tag.id]
-                    )
-                  }
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                    selectedTagIds.includes(tag.id)
-                      ? "text-white"
-                      : "border border-[#d4c9bb] bg-[var(--color-cream)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-                  }`}
-                  style={
-                    selectedTagIds.includes(tag.id)
-                      ? { backgroundColor: tag.color }
-                      : {}
-                  }
+                  className="rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
                 >
-                  {tag.name}
+                  Add
                 </button>
-              ))}
+              </div>
             </div>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddTag();
-                  }
-                }}
-                className="flex-1 rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                placeholder="New tag..."
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                placeholder="Personal notes..."
               />
-              <button
-                onClick={handleAddTag}
-                type="button"
-                className="rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
-              >
-                Add
-              </button>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                Source
+              </label>
+              <input
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                placeholder="How you heard about it..."
+              />
             </div>
           </div>
         ) : (
-          place.tags.length > 0 && (
+          /* ── Read-Only Mode ── */
+          <>
+            {/* Editorial blurb */}
+            {blurb && (
+              <div className="border-l-2 border-[var(--color-amber)] pl-3.5">
+                <p className="text-sm italic leading-relaxed text-[var(--color-ink-light)]">
+                  &ldquo;{blurb.text}&rdquo;
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--color-ink-muted)]">
+                  &mdash; {blurb.source}
+                </p>
+              </div>
+            )}
+
+            {/* Ratings */}
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                Tags
+                Ratings
               </p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <RatingsTable ratings={sortedRatings} />
+              <div className="mt-1.5">
+
+                {!addingRating ? (
+                  <button
+                    onClick={() => setAddingRating(true)}
+                    className="mt-1 text-xs font-medium text-[var(--color-amber)] hover:text-[var(--color-amber-light)]"
+                  >
+                    + Add rating
+                  </button>
+                ) : (
+                  <div className="mt-2 space-y-2 rounded-lg border border-[#e0d6ca] bg-[var(--color-cream)] p-3">
+                    <input
+                      value={ratingSource}
+                      onChange={(e) => setRatingSource(e.target.value)}
+                      placeholder="Source (e.g. michelin, zagat)"
+                      className="block w-full rounded-md border border-[#d4c9bb] bg-white px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        value={ratingValue}
+                        onChange={(e) => setRatingValue(e.target.value)}
+                        placeholder="Rating (e.g. 4.5)"
+                        type="number"
+                        step="0.1"
+                        className="block flex-1 rounded-md border border-[#d4c9bb] bg-white px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                      />
+                      <input
+                        value={ratingMaxValue}
+                        onChange={(e) => setRatingMaxValue(e.target.value)}
+                        placeholder="Max (e.g. 5)"
+                        type="number"
+                        step="1"
+                        className="block w-20 rounded-md border border-[#d4c9bb] bg-white px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                      />
+                    </div>
+                    <input
+                      value={ratingNotes}
+                      onChange={(e) => setRatingNotes(e.target.value)}
+                      placeholder="Notes"
+                      className="block w-full rounded-md border border-[#d4c9bb] bg-white px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                    />
+                    <input
+                      value={ratingUrl}
+                      onChange={(e) => setRatingUrl(e.target.value)}
+                      placeholder="URL to review"
+                      className="block w-full rounded-md border border-[#d4c9bb] bg-white px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAddRating}
+                        className="rounded-md bg-[var(--color-amber)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-amber-light)]"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setAddingRating(false)}
+                        className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Tags (no section label) */}
+            {place.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
                 {place.tags.map((tag) => (
                   <span
                     key={tag.id}
-                    className="rounded px-2 py-0.5 text-[11px] font-semibold text-white/90"
+                    className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-white/90"
                     style={{ backgroundColor: tag.color }}
                   >
                     {tag.name}
                   </span>
                 ))}
               </div>
-            </div>
-          )
-        )}
+            )}
 
-        {/* Hours */}
-        {hoursDescriptions && (
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-              Hours
-            </p>
-            <div className="mt-1.5 space-y-0.5">
-              {hoursDescriptions.map((h: string, i: number) => (
-                <p key={i} className="text-xs text-[var(--color-ink-light)]">
-                  {h}
-                </p>
-              ))}
-            </div>
-          </div>
-        )}
+            {/* Hours — collapsible */}
+            {hoursDescriptions && (
+              <div>
+                <button
+                  onClick={() => setHoursExpanded(!hoursExpanded)}
+                  className="flex w-full items-center gap-2 text-left"
+                >
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                    Hours
+                  </span>
+                  {todayHours && !hoursExpanded && (
+                    <span className="text-xs text-[var(--color-ink-light)]">
+                      Today {todayHours.hours}
+                    </span>
+                  )}
+                  <span className="ml-auto text-[var(--color-ink-muted)]">
+                    <ChevronIcon expanded={hoursExpanded} />
+                  </span>
+                </button>
+                {hoursExpanded && (
+                  <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                    {hoursDescriptions.map((desc: string, i: number) => {
+                      const { day, hours } = parseHoursLine(desc);
+                      const isToday = day === todayName;
+                      return (
+                        <div key={i} className="col-span-2 grid grid-cols-subgrid">
+                          <span
+                            className={`text-xs ${
+                              isToday
+                                ? "font-semibold text-[var(--color-ink)]"
+                                : "text-[var(--color-ink-muted)]"
+                            }`}
+                          >
+                            {day}
+                          </span>
+                          <span
+                            className={`text-xs ${
+                              isToday
+                                ? "font-semibold text-[var(--color-ink)]"
+                                : "text-[var(--color-ink-light)]"
+                            }`}
+                          >
+                            {hours}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
-        {/* Editable fields */}
-        <div className="border-t border-[#e0d6ca] pt-4">
-          {editing ? (
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                  Status
-                </label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-amber)] focus:outline-none"
-                >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                  Notes
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                  placeholder="Personal notes..."
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                  Source
-                </label>
-                <input
-                  value={source}
-                  onChange={(e) => setSource(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                  placeholder="How you heard about it..."
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="rounded-md bg-[var(--color-amber)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-amber-light)] disabled:opacity-50"
-                >
-                  {saving ? "Saving..." : "Save"}
-                </button>
-                <button
-                  onClick={() => {
-                    setPlaceType(place.placeType || "");
-                    setSelectedTagIds(place.tags.map((t) => t.id));
-                    setNewTagName("");
-                    setEditing(false);
-                  }}
-                  className="rounded-md border border-[#d4c9bb] px-4 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment-dark)]"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                  Status
-                </p>
-                <p className="mt-0.5 text-sm capitalize text-[var(--color-ink)]">
-                  {STATUS_OPTIONS.find((s) => s.value === place.status)
-                    ?.label || place.status}
-                </p>
-              </div>
-              {place.personalNotes && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                    Notes
-                  </p>
-                  <p className="mt-0.5 text-sm italic text-[var(--color-ink-light)]">
+            {/* Personal notes & source */}
+            {(place.personalNotes || place.source) && (
+              <div className="space-y-1.5 border-t border-[#e0d6ca] pt-4">
+                {place.personalNotes && (
+                  <p className="text-sm italic text-[var(--color-ink-light)]">
                     {place.personalNotes}
                   </p>
-                </div>
-              )}
-              {place.source && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                    Source
+                )}
+                {place.source && (
+                  <p className="text-xs text-[var(--color-ink-muted)]">
+                    Source: {place.source}
                   </p>
-                  <p className="mt-0.5 text-sm text-[var(--color-ink-light)]">
-                    {place.source}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                )}
+              </div>
+            )}
 
-        {/* Action links */}
-        <div className="flex flex-wrap gap-2 border-t border-[#e0d6ca] pt-4">
-          {place.websiteUrl && (
-            <a
-              href={place.websiteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-[#d4c9bb] px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-            >
-              Website
-            </a>
-          )}
-          {place.phone && (
-            <a
-              href={`tel:${place.phone}`}
-              className="inline-flex items-center gap-1 rounded-md border border-[#d4c9bb] px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-            >
-              Call
-            </a>
-          )}
-          {place.menuUrl && (
-            <a
-              href={place.menuUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-[#d4c9bb] px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-            >
-              Menu
-            </a>
-          )}
-        </div>
-
-        {/* Review source links */}
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-            Look up on
-          </p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {reviewLinks.map((link) => (
+            {/* Consolidated links */}
+            <div className="flex flex-wrap gap-1.5 border-t border-[#e0d6ca] pt-4">
               <a
-                key={link.source}
-                href={link.url}
+                href={directionsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded-md border border-[#e0d6ca] bg-[var(--color-cream)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
               >
-                {link.label}
+                Directions
               </a>
-            ))}
-          </div>
-        </div>
+              {place.websiteUrl && (
+                <a
+                  href={place.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-[#e0d6ca] bg-[var(--color-cream)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
+                >
+                  Website
+                </a>
+              )}
+              {place.menuUrl && (
+                <a
+                  href={place.menuUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-[#e0d6ca] bg-[var(--color-cream)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
+                >
+                  Menu
+                </a>
+              )}
+              {place.phone && (
+                <a
+                  href={`tel:${place.phone}`}
+                  className="rounded-md border border-[#e0d6ca] bg-[var(--color-cream)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
+                >
+                  Call
+                </a>
+              )}
+              {reviewLinks.map((link) => (
+                <a
+                  key={link.source}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-[#e0d6ca] bg-[var(--color-cream)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Footer actions */}
+      {/* Footer */}
       <div className="border-t border-[#e0d6ca] px-5 py-3">
         <div className="flex gap-2">
-          {!editing && (
-            <button
-              onClick={() => {
-                setStatus(place.status);
-                setPlaceType(place.placeType || "");
-                setNotes(place.personalNotes || "");
-                setSource(place.source || "");
-                setSelectedTagIds(place.tags.map((t) => t.id));
-                setNewTagName("");
-                setEditing(true);
-              }}
-              className="flex-1 rounded-md bg-[var(--color-cream)] px-3 py-2 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-parchment-dark)]"
-            >
-              Edit
-            </button>
+          {editing ? (
+            <>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 rounded-md bg-[var(--color-amber)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-amber-light)] disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={() => {
+                  setPlaceType(place.placeType || "");
+                  setSelectedTagIds(place.tags.map((t) => t.id));
+                  setNewTagName("");
+                  setEditing(false);
+                }}
+                className="rounded-md border border-[#d4c9bb] px-4 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment-dark)]"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => {
+                  setStatus(place.status);
+                  setPlaceType(place.placeType || "");
+                  setNotes(place.personalNotes || "");
+                  setSource(place.source || "");
+                  setSelectedTagIds(place.tags.map((t) => t.id));
+                  setNewTagName("");
+                  setEditing(true);
+                }}
+                className="flex-1 rounded-md bg-[var(--color-cream)] px-3 py-2 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-parchment-dark)]"
+              >
+                Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-terracotta)] transition-colors hover:bg-[var(--color-terracotta)]/10"
+              >
+                Delete
+              </button>
+            </>
           )}
-          <button
-            onClick={handleDelete}
-            className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-terracotta)] transition-colors hover:bg-[var(--color-terracotta)]/10"
-          >
-            Delete
-          </button>
         </div>
       </div>
     </div>

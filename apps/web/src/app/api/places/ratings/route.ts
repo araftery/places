@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { placeId, source, rating, notes, ratingUrl } = body;
+  const { placeId, source, rating, ratingMax, notes, reviewCount, ratingUrl } = body;
 
   if (!placeId || !source) {
     return NextResponse.json(
@@ -20,8 +20,10 @@ export async function POST(request: NextRequest) {
     .values({
       placeId,
       source,
-      rating: rating || null,
+      rating: rating ?? null,
+      ratingMax: ratingMax ?? null,
       notes: notes || null,
+      reviewCount: reviewCount ?? null,
       ratingUrl: ratingUrl || null,
       lastFetched: new Date(),
     })

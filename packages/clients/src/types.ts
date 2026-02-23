@@ -24,6 +24,8 @@ export interface SearchResult {
   neighborhood: string | null;
   /** URL to the review/listing page */
   url: string | null;
+  /** When the review was published (optional, available from some providers in search) */
+  reviewDate?: string | null;
 }
 
 /** Common result shape returned by all client lookup methods */

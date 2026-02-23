@@ -108,7 +108,7 @@ describe("audit-nyt task", () => {
     mockScrapeNyt.mockResolvedValue({
       found: true,
       externalId: "nyt-123",
-      ratingData: { source: "nyt", rating: "2/3", notes: "Great", ratingUrl: null, externalId: "nyt-123" },
+      ratingData: { source: "nyt", rating: 2, ratingMax: 4, notes: "Great", reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "nyt-123" },
       placeData: null,
     });
 

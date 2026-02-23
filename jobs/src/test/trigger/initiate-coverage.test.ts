@@ -120,13 +120,13 @@ describe("initiate-coverage task", () => {
     const googleResult = {
       found: true,
       externalId: "ChIJ123",
-      ratingData: { source: "google", rating: "4.5/5", notes: null, ratingUrl: null, externalId: "ChIJ123" },
+      ratingData: { source: "google", rating: 4.5, ratingMax: 5, notes: null, reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "ChIJ123" },
       placeData: { hoursJson: {}, closedPermanently: false },
     };
     const infResult = {
       found: true,
       externalId: "slug-1",
-      ratingData: { source: "infatuation", rating: "8/10", notes: null, ratingUrl: null, externalId: "slug-1" },
+      ratingData: { source: "infatuation", rating: 8, ratingMax: 10, notes: null, reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "slug-1" },
       placeData: null,
     };
     const beliResult = {
@@ -138,7 +138,7 @@ describe("initiate-coverage task", () => {
     const nytResult = {
       found: true,
       externalId: "nyt-1",
-      ratingData: { source: "nyt", rating: "2/3", notes: "Great", ratingUrl: null, externalId: "nyt-1" },
+      ratingData: { source: "nyt", rating: 2, ratingMax: 4, notes: "Great", reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "nyt-1" },
       placeData: null,
     };
 
@@ -166,7 +166,7 @@ describe("initiate-coverage task", () => {
     mockScrapeGoogle.mockResolvedValue({
       found: true,
       externalId: "ChIJ123",
-      ratingData: { source: "google", rating: "4/5", notes: null, ratingUrl: null, externalId: "ChIJ123" },
+      ratingData: { source: "google", rating: 4, ratingMax: 5, notes: null, reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "ChIJ123" },
       placeData: null,
     });
 
@@ -218,7 +218,7 @@ describe("initiate-coverage task", () => {
     mockScrapeGoogle.mockResolvedValue({
       found: true,
       externalId: "ChIJ123",
-      ratingData: { source: "google", rating: "4/5", notes: null, ratingUrl: null, externalId: "ChIJ123" },
+      ratingData: { source: "google", rating: 4, ratingMax: 5, notes: null, reviewCount: null, ratingUrl: null, reviewDate: null, externalId: "ChIJ123" },
       placeData: { hoursJson: { periods: [] }, closedPermanently: false },
     });
 

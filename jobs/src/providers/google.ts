@@ -37,13 +37,12 @@ export async function scrapeGoogle(place: PlaceInfo): Promise<ScrapeResult> {
     });
 
     const isClosed = details.businessStatus === "CLOSED_PERMANENTLY";
-    const rating = details.rating != null ? `${details.rating}/5` : null;
-    const reviewCount = details.userRatingCount ?? 0;
-    const notes = reviewCount ? `${reviewCount} reviews` : null;
+    const rating = details.rating ?? null;
+    const reviewCount = details.userRatingCount ?? null;
 
     span.setAttribute("found", true);
     span.setAttribute("rating", rating ?? "none");
-    span.setAttribute("reviewCount", reviewCount);
+    span.setAttribute("reviewCount", reviewCount ?? 0);
     span.setAttribute("isClosed", isClosed);
     span.setAttribute("hasHours", !!details.regularOpeningHours);
     span.setAttribute("businessStatus", details.businessStatus ?? "unknown");
@@ -64,8 +63,11 @@ export async function scrapeGoogle(place: PlaceInfo): Promise<ScrapeResult> {
       ratingData: {
         source: "google",
         rating,
-        notes,
+        ratingMax: 5,
+        notes: null,
+        reviewCount,
         ratingUrl: null,
+        reviewDate: null,
         externalId: place.googlePlaceId,
       },
       placeData: {

@@ -110,7 +110,7 @@ describe("audit-beli task", () => {
     mockScrapeBeli.mockResolvedValue({
       found: true,
       externalId: "beli-123",
-      ratingData: { source: "beli", rating: "8/10", notes: "42 ratings", ratingUrl: null, externalId: "beli-123" },
+      ratingData: { source: "beli", rating: 8, ratingMax: 10, notes: null, reviewCount: 42, ratingUrl: null, reviewDate: null, externalId: "beli-123" },
       placeData: null,
     });
 

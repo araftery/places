@@ -15,6 +15,7 @@ const dmSans = DM_Sans({
   weight: ["300", "400", "500", "600", "700"],
 });
 
+
 export const metadata: Metadata = {
   title: "Places",
   description: "Track your favorite and recommended places",
