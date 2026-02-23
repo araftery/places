@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/api/cron/"];
 const SESSION_COOKIE = "places_session";
 
 export async function middleware(request: NextRequest) {
