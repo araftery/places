@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Place, Tag, City, PLACE_TYPES, STATUS_OPTIONS } from "@/lib/types";
+import { Place, Tag, City, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 import ReviewBanner from "./ReviewBanner";
 import { Filters, DEFAULT_FILTERS, applyFilters } from "./Sidebar";
@@ -74,13 +74,13 @@ export default function MobileBottomSheet({
             className="flex items-center gap-1 rounded-md bg-[var(--color-sidebar-surface)] px-2 py-1 text-xs text-[var(--color-sidebar-muted)]"
           >
             Filters
-            {filters.status.length +
+            {(filters.showArchived ? 1 : 0) +
               filters.tagIds.length +
               filters.placeTypes.length +
               (filters.openNow ? 1 : 0) >
               0 && (
               <span className="rounded bg-[var(--color-amber)] px-1 text-[10px] font-bold text-white">
-                {filters.status.length +
+                {(filters.showArchived ? 1 : 0) +
                   filters.tagIds.length +
                   filters.placeTypes.length +
                   (filters.openNow ? 1 : 0)}
@@ -124,26 +124,18 @@ export default function MobileBottomSheet({
       {showFilters && (
         <div className="space-y-2 border-t border-[var(--color-sidebar-border)] px-4 py-3">
           <div className="flex flex-wrap gap-1.5">
-            {STATUS_OPTIONS.map((s) => (
-              <button
-                key={s.value}
-                onClick={() =>
-                  onFiltersChange({
-                    ...filters,
-                    status: filters.status.includes(s.value)
-                      ? filters.status.filter((v) => v !== s.value)
-                      : [...filters.status, s.value],
-                  })
-                }
-                className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                  filters.status.includes(s.value)
-                    ? "bg-[var(--color-amber)] text-white"
-                    : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)]"
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
+            <button
+              onClick={() =>
+                onFiltersChange({ ...filters, showArchived: !filters.showArchived })
+              }
+              className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                filters.showArchived
+                  ? "bg-[var(--color-amber)] text-white"
+                  : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)]"
+              }`}
+            >
+              Show Archived
+            </button>
           </div>
           <div>
             <button

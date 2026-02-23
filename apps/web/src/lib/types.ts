@@ -42,7 +42,8 @@ export interface Place {
   websiteUrl: string | null;
   menuUrl: string | null;
   phone: string | null;
-  status: string;
+  beenThere: boolean;
+  archived: boolean;
   personalNotes: string | null;
   source: string | null;
   googlePlaceId: string | null;
@@ -67,7 +68,8 @@ export interface PlaceFormData {
   websiteUrl: string | null;
   menuUrl: string | null;
   phone: string | null;
-  status: string;
+  beenThere: boolean;
+  archived: boolean;
   personalNotes: string | null;
   source: string | null;
   googlePlaceId: string | null;
@@ -86,12 +88,6 @@ export const PLACE_TYPES = [
   { value: "night_club", label: "Night Club" },
   { value: "bakery", label: "Bakery" },
   { value: "other", label: "Other" },
-] as const;
-
-export const STATUS_OPTIONS = [
-  { value: "want_to_try", label: "Want to Try" },
-  { value: "been_there", label: "Been There" },
-  { value: "archived", label: "Archived" },
 ] as const;
 
 export const GOOGLE_TYPE_MAP: Record<string, string> = {

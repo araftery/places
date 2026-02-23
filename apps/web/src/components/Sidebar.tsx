@@ -1,6 +1,6 @@
 "use client";
 
-import { Place, Tag, City, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, City, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 import ReviewBanner from "./ReviewBanner";
 import { useState, useMemo } from "react";
@@ -25,7 +25,7 @@ interface SidebarProps {
 
 export interface Filters {
   search: string;
-  status: string[];
+  showArchived: boolean;
   tagIds: number[];
   placeTypes: string[];
   cityId: number | null;
@@ -37,7 +37,7 @@ export interface Filters {
 
 export const DEFAULT_FILTERS: Filters = {
   search: "",
-  status: ["want_to_try", "been_there"],
+  showArchived: false,
   tagIds: [],
   placeTypes: [],
   cityId: null,
@@ -100,8 +100,7 @@ export function applyFilters(places: Place[], filters: Filters): Place[] {
     )
       return false;
 
-    if (filters.status.length > 0 && !filters.status.includes(p.status))
-      return false;
+    if (!filters.showArchived && p.archived) return false;
 
     if (filters.tagIds.length > 0) {
       const placeTagIds = p.tags.map((t) => t.id);
@@ -181,7 +180,7 @@ export default function Sidebar({
   }, [places]);
 
   const activeFilterCount =
-    filters.status.length +
+    (filters.showArchived ? 1 : 0) +
     filters.tagIds.length +
     filters.placeTypes.length +
     (filters.cityId !== null ? 1 : 0) +
@@ -275,36 +274,20 @@ export default function Sidebar({
       {/* Filters Panel */}
       {showFilters && (
         <div className="relative z-10 space-y-3 border-b border-[var(--color-sidebar-border)] px-5 py-4">
-          {/* Status */}
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-              Status
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {STATUS_OPTIONS.map((s) => {
-                const active = filters.status.includes(s.value);
-                return (
-                  <button
-                    key={s.value}
-                    onClick={() =>
-                      onFiltersChange({
-                        ...filters,
-                        status: active
-                          ? filters.status.filter((v) => v !== s.value)
-                          : [...filters.status, s.value],
-                      })
-                    }
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                      active
-                        ? "bg-[var(--color-amber)] text-white"
-                        : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Show Archived */}
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() =>
+                onFiltersChange({ ...filters, showArchived: !filters.showArchived })
+              }
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                filters.showArchived
+                  ? "bg-[var(--color-amber)] text-white"
+                  : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+              }`}
+            >
+              Show Archived
+            </button>
           </div>
 
           {/* Open Now */}

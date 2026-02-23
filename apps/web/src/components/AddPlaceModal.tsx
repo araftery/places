@@ -6,7 +6,6 @@ import {
   Place,
   City,
   PLACE_TYPES,
-  STATUS_OPTIONS,
   GOOGLE_TYPE_MAP,
 } from "@/lib/types";
 
@@ -71,7 +70,6 @@ export default function AddPlaceModal({
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
   // Form fields
-  const [status, setStatus] = useState("want_to_try");
   const [placeType, setPlaceType] = useState("");
   const [cuisineType, setCuisineType] = useState("");
   const [cityId, setCityId] = useState<number | null>(null);
@@ -144,7 +142,7 @@ export default function AddPlaceModal({
       );
       if (existing) {
         setDuplicateWarning(
-          `"${existing.name}" is already in your list (${existing.status.replace("_", " ")})`
+          `"${existing.name}" is already in your list${existing.archived ? " (archived)" : ""}`
         );
       }
 
@@ -261,7 +259,6 @@ export default function AddPlaceModal({
           priceRange: details.priceRange,
           websiteUrl: details.websiteUrl,
           phone: details.phone,
-          status,
           personalNotes: notes || null,
           source: source || null,
           googlePlaceId: details.googlePlaceId,
@@ -285,7 +282,6 @@ export default function AddPlaceModal({
     setDetails(null);
     onPlacePreview?.(null);
     setDuplicateWarning(null);
-    setStatus("want_to_try");
     setPlaceType("");
     setCuisineType("");
     setCityId(null);
@@ -442,36 +438,20 @@ export default function AddPlaceModal({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>Status</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className={inputClass}
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Type</label>
-                  <select
-                    value={placeType}
-                    onChange={(e) => setPlaceType(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Select...</option>
-                    {PLACE_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className={labelClass}>Type</label>
+                <select
+                  value={placeType}
+                  onChange={(e) => setPlaceType(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select...</option>
+                  {PLACE_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

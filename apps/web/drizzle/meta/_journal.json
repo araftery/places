@@ -15,6 +15,13 @@
       "when": 1771817766224,
       "tag": "0001_young_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771900000000,
+      "tag": "0002_replace_status_with_booleans",
+      "breakpoints": true
     }
   ]
 }

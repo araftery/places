@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { places, placeTags, tags, cities } from "@/db/schema";
-import { eq, and, ne, lt } from "drizzle-orm";
+import { eq, and, lt } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export async function GET() {
     .where(
       and(
         eq(places.closedPermanently, true),
-        ne(places.status, "archived")
+        eq(places.archived, false)
       )
     );
 
@@ -28,7 +28,8 @@ export async function GET() {
     .from(places)
     .where(
       and(
-        eq(places.status, "want_to_try"),
+        eq(places.beenThere, false),
+        eq(places.archived, false),
         lt(places.createdAt, staleDate)
       )
     );

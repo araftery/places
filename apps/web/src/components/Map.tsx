@@ -14,12 +14,6 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { Place } from "@/lib/types";
 import type { TravelTimeBand } from "@/app/page";
 
-const STATUS_COLORS: Record<string, string> = {
-  want_to_try: "#5b7b9a",
-  been_there: "#5a7a5e",
-  archived: "#8a7e72",
-};
-
 const TYPE_ICONS: Record<string, string> = {
   restaurant: "\u{1F374}",
   bar: "\u{1F378}",
@@ -134,7 +128,7 @@ export default function Map({
       )}
 
       {places.map((place) => {
-        const color = STATUS_COLORS[place.status] || "#5b7b9a";
+        const color = place.beenThere ? "#5a7a5e" : "#5b7b9a";
         const icon = TYPE_ICONS[place.placeType || "other"] || "\u{1F4CD}";
         const isSelected = selectedPlace?.id === place.id;
 
@@ -157,8 +151,7 @@ export default function Map({
               <div
                 className="flex h-8 w-8 items-center justify-center rounded-full text-sm"
                 style={{
-                  backgroundColor:
-                    place.status === "want_to_try" ? "#faf6f1" : color,
+                  backgroundColor: !place.beenThere ? "#faf6f1" : color,
                   border: `2.5px solid ${color}`,
                   boxShadow: isSelected
                     ? `0 0 0 2px #c47d2e, 0 2px 8px rgba(0,0,0,0.2)`

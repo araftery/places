@@ -1,6 +1,6 @@
 "use client";
 
-import { Place, Tag, PlaceRating, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, PlaceRating, PLACE_TYPES } from "@/lib/types";
 import { generateReviewLinks } from "@/lib/review-links";
 import { formatRating, formatCount, getBestBlurb } from "@/lib/format-ratings";
 import { useState } from "react";
@@ -185,7 +185,7 @@ export default function PlaceDetail({
   onCreateTag,
 }: PlaceDetailProps) {
   const [editing, setEditing] = useState(false);
-  const [status, setStatus] = useState(place.status);
+  const [beenThere, setBeenThere] = useState(place.beenThere);
   const [placeType, setPlaceType] = useState(place.placeType || "");
   const [notes, setNotes] = useState(place.personalNotes || "");
   const [source, setSource] = useState(place.source || "");
@@ -273,7 +273,7 @@ export default function PlaceDetail({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: place.id,
-          status,
+          beenThere,
           placeType: placeType || null,
           personalNotes: notes || null,
           source: source || null,
@@ -384,19 +384,35 @@ export default function PlaceDetail({
           <div className="space-y-4">
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                Status
+                Been There
               </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-amber)] focus:outline-none"
+              <button
+                type="button"
+                onClick={() => setBeenThere(!beenThere)}
+                className={`mt-1 flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  beenThere
+                    ? "border-[var(--color-sage)] bg-[var(--color-sage)]/10 text-[var(--color-sage)]"
+                    : "border-[#d4c9bb] bg-white text-[var(--color-ink-muted)]"
+                }`}
               >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {beenThere ? (
+                    <polyline points="20 6 9 17 4 12" />
+                  ) : (
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                  )}
+                </svg>
+                {beenThere ? "Yes, I\u2019ve been here" : "Not yet"}
+              </button>
             </div>
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
@@ -495,6 +511,25 @@ export default function PlaceDetail({
         ) : (
           /* ── Read-Only Mode ── */
           <>
+            {/* Been There indicator */}
+            {place.beenThere && (
+              <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-sage)]">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Been There
+              </div>
+            )}
+
             {/* Editorial blurb */}
             {blurb && (
               <div className="border-l-2 border-[var(--color-amber)] pl-3.5">
@@ -744,7 +779,7 @@ export default function PlaceDetail({
             <>
               <button
                 onClick={() => {
-                  setStatus(place.status);
+                  setBeenThere(place.beenThere);
                   setPlaceType(place.placeType || "");
                   setNotes(place.personalNotes || "");
                   setSource(place.source || "");
@@ -755,6 +790,20 @@ export default function PlaceDetail({
                 className="flex-1 rounded-md bg-[var(--color-cream)] px-3 py-2 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-parchment-dark)]"
               >
                 Edit
+              </button>
+              <button
+                onClick={async () => {
+                  const res = await fetch("/api/places", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: place.id, archived: !place.archived }),
+                  });
+                  const updated = await res.json();
+                  onUpdate({ ...place, ...updated });
+                }}
+                className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-parchment-dark)]"
+              >
+                {place.archived ? "Unarchive" : "Archive"}
               </button>
               <button
                 onClick={handleDelete}

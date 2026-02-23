@@ -3,18 +3,6 @@
 import { Place } from "@/lib/types";
 import type { TravelTimeBand } from "@/app/page";
 
-const STATUS_LABELS: Record<string, string> = {
-  want_to_try: "Want to Try",
-  been_there: "Been There",
-  archived: "Archived",
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  want_to_try: "bg-[var(--color-slate-blue)]/20 text-[#8aafc9]",
-  been_there: "bg-[var(--color-sage)]/20 text-[var(--color-sage-light)]",
-  archived: "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)]",
-};
-
 const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
 
 interface PlaceCardProps {
@@ -58,13 +46,21 @@ export default function PlaceCard({
             </p>
           )}
         </div>
-        <span
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-            STATUS_STYLES[place.status] || ""
-          }`}
-        >
-          {STATUS_LABELS[place.status] || place.status}
-        </span>
+        {place.beenThere && (
+          <svg
+            className="shrink-0 text-[var(--color-sage-light)]"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
       </div>
 
       {place.neighborhood && (

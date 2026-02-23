@@ -233,10 +233,10 @@ export default function Home() {
     await fetch("/api/places", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status: "archived" }),
+      body: JSON.stringify({ id, archived: true }),
     });
     setPlaces((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: "archived" } : p))
+      prev.map((p) => (p.id === id ? { ...p, archived: true } : p))
     );
     setReviewClosed((prev) => prev.filter((p) => p.id !== id));
     setReviewStale((prev) => prev.filter((p) => p.id !== id));
