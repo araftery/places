@@ -81,11 +81,42 @@ export const STATUS_OPTIONS = [
 ] as const;
 
 export const GOOGLE_TYPE_MAP: Record<string, string> = {
+  // Direct matches
   restaurant: "restaurant",
   bar: "bar",
   cafe: "cafe",
-  tourist_attraction: "tourist_site",
-  store: "retail",
-  night_club: "night_club",
   bakery: "bakery",
+  night_club: "night_club",
+  // Tourist / attractions
+  tourist_attraction: "tourist_site",
+  museum: "tourist_site",
+  art_gallery: "tourist_site",
+  amusement_park: "tourist_site",
+  aquarium: "tourist_site",
+  zoo: "tourist_site",
+  landmark: "tourist_site",
+  historical_landmark: "tourist_site",
+  national_park: "tourist_site",
+  performing_arts_theater: "tourist_site",
+  // Retail
+  store: "retail",
+  shopping_mall: "retail",
+  book_store: "retail",
+  clothing_store: "retail",
+  grocery_store: "retail",
+  supermarket: "retail",
+  // Aliases
+  coffee_shop: "cafe",
+  pub: "bar",
+  wine_bar: "bar",
+  brewery: "bar",
+  cocktail_bar: "bar",
+  // Food variants
+  ice_cream_shop: "restaurant",
+  sandwich_shop: "restaurant",
+  pizza_restaurant: "restaurant",
+  steak_house: "restaurant",
+  seafood_restaurant: "restaurant",
+  meal_takeaway: "restaurant",
+  meal_delivery: "restaurant",
 };

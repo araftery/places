@@ -33,6 +33,7 @@ interface PlaceDetails {
   googleRating: number | null;
   googleRatingCount: number | null;
   primaryType: string | null;
+  types: string[];
   neighborhood: string | null;
   city: string | null;
   cuisineTypes: string[];
@@ -132,9 +133,12 @@ export default function AddPlaceModal({
         );
       }
 
-      // Auto-fill type from Google
+      // Auto-fill type from Google primaryType, then fall back to types array
       if (data.primaryType && GOOGLE_TYPE_MAP[data.primaryType]) {
         setPlaceType(GOOGLE_TYPE_MAP[data.primaryType]);
+      } else {
+        const fallback = data.types?.find((t: string) => GOOGLE_TYPE_MAP[t]);
+        if (fallback) setPlaceType(GOOGLE_TYPE_MAP[fallback]);
       }
 
       // Auto-fill city and neighborhood from Google address components

@@ -35,8 +35,16 @@ export async function POST(request: NextRequest) {
     components.find((c) => c.types.includes("neighborhood"))?.longText || null;
   const sublocality =
     components.find((c) => c.types.includes("sublocality"))?.longText || null;
-  const city =
+  const locality =
     components.find((c) => c.types.includes("locality"))?.longText || null;
+  const postalTown =
+    components.find((c) => c.types.includes("postal_town"))?.longText || null;
+  const adminLevel1 =
+    components.find((c) => c.types.includes("administrative_area_level_1"))?.longText || null;
+  // For cities with boroughs (e.g. NYC), there's no locality — use the
+  // state/region name which for NYC is "New York". Only apply this when a
+  // sublocality exists (signals a borough-style address).
+  const city = locality || postalTown || (sublocality ? adminLevel1 : null) || null;
 
   // Derive cuisine hints from Google types
   const cuisineTypes = (details.types || [])
@@ -72,8 +80,9 @@ export async function POST(request: NextRequest) {
     googleRating: details.rating || null,
     googleRatingCount: details.userRatingCount || null,
     primaryType: details.primaryType || null,
+    types: details.types || [],
     neighborhood: neighborhood || sublocality || null,
-    city: city || null,
+    city,
     cuisineTypes,
   });
 }

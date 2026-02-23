@@ -25,6 +25,7 @@ export default function PlaceDetail({
 }: PlaceDetailProps) {
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState(place.status);
+  const [placeType, setPlaceType] = useState(place.placeType || "");
   const [notes, setNotes] = useState(place.personalNotes || "");
   const [source, setSource] = useState(place.source || "");
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>(
@@ -73,6 +74,7 @@ export default function PlaceDetail({
         body: JSON.stringify({
           id: place.id,
           status,
+          placeType: placeType || null,
           personalNotes: notes || null,
           source: source || null,
           tagIds: selectedTagIds,
@@ -164,16 +166,36 @@ export default function PlaceDetail({
 
         {/* Info grid */}
         <div className="flex flex-wrap gap-x-6 gap-y-3">
-          {place.placeType && (
+          {editing ? (
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
                 Type
               </p>
-              <p className="mt-0.5 text-sm capitalize text-[var(--color-ink)]">
-                {PLACE_TYPES.find((t) => t.value === place.placeType)?.label ||
-                  place.placeType}
-              </p>
+              <select
+                value={placeType}
+                onChange={(e) => setPlaceType(e.target.value)}
+                className="mt-0.5 rounded-md border border-[#d4c9bb] bg-white px-2 py-1 text-sm text-[var(--color-ink)] focus:border-[var(--color-amber)] focus:outline-none"
+              >
+                <option value="">None</option>
+                {PLACE_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
             </div>
+          ) : (
+            place.placeType && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                  Type
+                </p>
+                <p className="mt-0.5 text-sm capitalize text-[var(--color-ink)]">
+                  {PLACE_TYPES.find((t) => t.value === place.placeType)?.label ||
+                    place.placeType}
+                </p>
+              </div>
+            )
           )}
           {place.priceRange && (
             <div>
@@ -462,6 +484,7 @@ export default function PlaceDetail({
                 </button>
                 <button
                   onClick={() => {
+                    setPlaceType(place.placeType || "");
                     setSelectedTagIds(place.tags.map((t) => t.id));
                     setNewTagName("");
                     setEditing(false);
@@ -567,6 +590,7 @@ export default function PlaceDetail({
             <button
               onClick={() => {
                 setStatus(place.status);
+                setPlaceType(place.placeType || "");
                 setNotes(place.personalNotes || "");
                 setSource(place.source || "");
                 setSelectedTagIds(place.tags.map((t) => t.id));
