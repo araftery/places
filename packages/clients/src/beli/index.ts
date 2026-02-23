@@ -1,4 +1,5 @@
 import type { SearchResult, LookupResult } from "../types.js";
+import { createFetch } from "../proxy";
 
 const BASE_URL =
   "https://backoffice-service-split-t57o3dxfca-nn.a.run.app";
@@ -19,6 +20,7 @@ export interface BeliClientConfig {
   accessToken?: string;
   /** Optional initial refresh token */
   refreshToken?: string;
+  proxyUrl?: string;
 }
 
 export interface BeliTokens {
@@ -30,9 +32,10 @@ export function createBeliClient(config: BeliClientConfig) {
   let accessToken = config.accessToken ?? "";
   let refreshToken = config.refreshToken ?? "";
   const userId = config.userId;
+  const fetchFn = createFetch(config.proxyUrl);
 
   async function login(): Promise<BeliTokens> {
-    const res = await fetch(`${BASE_URL}/api/token/`, {
+    const res = await fetchFn(`${BASE_URL}/api/token/`, {
       method: "POST",
       headers: DEFAULT_HEADERS,
       body: JSON.stringify({
@@ -53,7 +56,7 @@ export function createBeliClient(config: BeliClientConfig) {
   }
 
   async function refreshAccessToken(): Promise<string> {
-    const res = await fetch(`${BASE_URL}/api/token/refresh/`, {
+    const res = await fetchFn(`${BASE_URL}/api/token/refresh/`, {
       method: "POST",
       headers: DEFAULT_HEADERS,
       body: JSON.stringify({ refresh: refreshToken }),
@@ -97,7 +100,7 @@ export function createBeliClient(config: BeliClientConfig) {
     init?: RequestInit
   ): Promise<Response> {
     const token = await ensureAuth();
-    const res = await fetch(url, {
+    const res = await fetchFn(url, {
       ...init,
       headers: {
         ...DEFAULT_HEADERS,
@@ -109,7 +112,7 @@ export function createBeliClient(config: BeliClientConfig) {
     // If we get a 401, try refreshing once
     if (res.status === 401) {
       await refreshAccessToken();
-      return fetch(url, {
+      return fetchFn(url, {
         ...init,
         headers: {
           ...DEFAULT_HEADERS,

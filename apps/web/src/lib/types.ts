@@ -4,6 +4,15 @@ export interface Tag {
   color: string;
 }
 
+export interface City {
+  id: number;
+  name: string;
+  country: string;
+  lat: number;
+  lng: number;
+  providers: string[];
+}
+
 export interface PlaceRating {
   id: number;
   placeId: number;
@@ -21,7 +30,8 @@ export interface Place {
   address: string | null;
   lat: number;
   lng: number;
-  city: string | null;
+  cityId: number | null;
+  cityName: string | null;
   neighborhood: string | null;
   placeType: string | null;
   cuisineType: string[] | null;
@@ -34,9 +44,7 @@ export interface Place {
   source: string | null;
   googlePlaceId: string | null;
   hoursJson: unknown;
-  hoursLastFetched: string | null;
   closedPermanently: boolean;
-  businessStatusCheckedAt: string | null;
   createdAt: string;
   updatedAt: string;
   tags: Tag[];
@@ -48,7 +56,7 @@ export interface PlaceFormData {
   address: string | null;
   lat: number;
   lng: number;
-  city: string | null;
+  cityId: number | null;
   neighborhood: string | null;
   placeType: string | null;
   cuisineType: string[] | null;

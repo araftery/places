@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Place, Tag, PLACE_TYPES, STATUS_OPTIONS } from "@/lib/types";
+import { Place, Tag, City, PLACE_TYPES, STATUS_OPTIONS } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 import ReviewBanner from "./ReviewBanner";
 import { Filters, DEFAULT_FILTERS, applyFilters } from "./Sidebar";
@@ -10,6 +10,7 @@ import type { TravelTimeBand } from "@/app/page";
 interface MobileBottomSheetProps {
   places: Place[];
   tags: Tag[];
+  cities: City[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
   onOpenAdd: () => void;
@@ -26,6 +27,7 @@ interface MobileBottomSheetProps {
 export default function MobileBottomSheet({
   places,
   tags,
+  cities,
   selectedPlace,
   onSelectPlace,
   onOpenAdd,

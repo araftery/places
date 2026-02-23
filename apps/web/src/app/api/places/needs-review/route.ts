@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { places, placeTags, tags } from "@/db/schema";
-import { eq, and, ne, lt, sql } from "drizzle-orm";
+import { places, placeTags, tags, cities } from "@/db/schema";
+import { eq, and, ne, lt } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +51,10 @@ export async function GET() {
         .innerJoin(tags, eq(placeTags.tagId, tags.id))
     : [];
 
+  // Fetch cities for joining
+  const allCities = await db.select().from(cities);
+  const cityMap = new Map(allCities.map((c) => [c.id, c]));
+
   const tagsByPlace = new Map<
     number,
     Array<{ id: number; name: string; color: string }>
@@ -64,6 +68,7 @@ export async function GET() {
 
   const addTags = (p: typeof closedPlaces[number]) => ({
     ...p,
+    cityName: p.cityId ? (cityMap.get(p.cityId)?.name ?? null) : null,
     tags: tagsByPlace.get(p.id) || [],
     ratings: [],
   });

@@ -8,10 +8,14 @@
     "./google": "./src/google/index.ts",
     "./infatuation": "./src/infatuation/index.ts",
     "./beli": "./src/beli/index.ts",
-    "./nyt": "./src/nyt/index.ts"
+    "./nyt": "./src/nyt/index.ts",
+    "./proxy": "./src/proxy.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "undici": "^7.0.0"
   },
   "devDependencies": {
     "typescript": "5.9.3"

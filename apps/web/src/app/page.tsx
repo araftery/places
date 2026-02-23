@@ -15,7 +15,7 @@ import IsochroneControl, {
   TIME_STEPS,
 } from "@/components/IsochroneControl";
 import MobileBottomSheet from "@/components/MobileBottomSheet";
-import { Place, Tag } from "@/lib/types";
+import { Place, Tag, City } from "@/lib/types";
 
 const MapView = dynamic(() => import("@/components/Map"), { ssr: false });
 
@@ -78,12 +78,17 @@ function getTravelTimeBand(
 export default function Home() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showManageTags, setShowManageTags] = useState(false);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [loading, setLoading] = useState(true);
+
+  // Preview pin from AddPlaceModal
+  const [previewPin, setPreviewPin] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
 
   // Isochrone state
   const [isoSettings, setIsoSettings] = useState<IsochroneSettings>({
@@ -112,6 +117,12 @@ export default function Home() {
     setTags(data);
   }, []);
 
+  const fetchCities = useCallback(async () => {
+    const res = await fetch("/api/cities");
+    const data = await res.json();
+    setCities(data);
+  }, []);
+
   const fetchReview = useCallback(async () => {
     try {
       const res = await fetch("/api/places/needs-review");
@@ -124,10 +135,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    Promise.all([fetchPlaces(), fetchTags(), fetchReview()]).finally(() =>
-      setLoading(false)
+    Promise.all([fetchPlaces(), fetchTags(), fetchCities(), fetchReview()]).finally(
+      () => setLoading(false)
     );
-  }, [fetchPlaces, fetchTags, fetchReview]);
+  }, [fetchPlaces, fetchTags, fetchCities, fetchReview]);
 
   const filteredPlaces = useMemo(() => {
     let result = applyFilters(places, filters);
@@ -150,6 +161,9 @@ export default function Home() {
   function handleSelectPlace(place: Place | null) {
     setSelectedPlace(place);
     setShowDetail(!!place);
+    if (place) {
+      setFlyTo({ lat: place.lat, lng: place.lng });
+    }
   }
 
   function handleUpdatePlace(updated: Place) {
@@ -243,6 +257,15 @@ export default function Home() {
     setReviewClosed((prev) => prev.filter((p) => p.id !== id));
   }
 
+  function handlePlacePreview(location: { lat: number; lng: number; name: string } | null) {
+    setPreviewPin(location);
+    if (location) {
+      setFlyTo({ lat: location.lat, lng: location.lng });
+    } else {
+      setFlyTo(null);
+    }
+  }
+
   function handleMapClick(lat: number, lng: number) {
     if (isoSettings.active) {
       setIsoSettings((prev) => ({ ...prev, lat, lng }));
@@ -312,6 +335,7 @@ export default function Home() {
         <Sidebar
           places={places}
           tags={tags}
+          cities={cities}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
           onOpenAdd={() => setShowAddModal(true)}
@@ -340,6 +364,8 @@ export default function Home() {
               : null
           }
           travelTimes={travelTimes}
+          flyTo={flyTo}
+          previewPin={previewPin}
         />
 
         {/* Isochrone controls */}
@@ -397,6 +423,7 @@ export default function Home() {
         <MobileBottomSheet
           places={filteredPlaces}
           tags={tags}
+          cities={cities}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
           onOpenAdd={() => setShowAddModal(true)}
@@ -437,8 +464,11 @@ export default function Home() {
         onClose={() => setShowAddModal(false)}
         onSave={fetchPlaces}
         tags={tags}
+        cities={cities}
         existingPlaces={places}
         onCreateTag={handleCreateTag}
+        onCityCreated={fetchCities}
+        onPlacePreview={handlePlacePreview}
       />
 
       {/* Manage Tags Modal */}

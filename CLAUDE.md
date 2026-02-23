@@ -4,27 +4,42 @@ Personal web app for tracking recommended and favorite places (restaurants, bars
 
 ## Monorepo Structure
 
-pnpm workspace monorepo with two packages:
+pnpm workspace monorepo:
 
 ```
 places/
 ├── apps/web/          # @places/web — Next.js web app
-├── packages/clients/  # @places/clients — Review site API clients
+├── jobs/              # @places/jobs — Trigger.dev async job system
+├── packages/
+│   ├── clients/       # @places/clients — Review site API clients
+│   └── db/            # @places/db — Shared Drizzle schema + DB connection
+├── scripts/           # Seed scripts (e.g. seed-cities.ts)
 ├── pnpm-workspace.yaml
 └── package.json       # Root scripts proxy to @places/web
 ```
 
 ### `apps/web` — Next.js Web App (`@places/web`)
 
-The main web application. All the UI, API routes, database, and auth live here.
+The main web application. All the UI, API routes, and auth live here. DB schema and connection are imported from `@places/db`.
+
+### `packages/db` — Database (`@places/db`)
+
+Shared Drizzle ORM schema and lazy-proxy DB connection. Used by both `@places/web` and `@places/jobs`.
 
 ### `packages/clients` — Review Clients (`@places/clients`)
 
-Standalone API clients for scraping/querying restaurant review sources. Each client exposes `search()` and `lookup()` methods returning a common `SearchResult`/`LookupResult` shape.
+Standalone API clients for scraping/querying restaurant review sources. Each client exposes `search()` and `lookup()` methods returning a common `SearchResult`/`LookupResult` shape. All clients support optional `proxyUrl` config for routing through Oxylabs.
 
 Clients: **Google Places**, **The Infatuation**, **Beli**, **NYT Cooking/Restaurant Reviews**
 
-Imported in the web app as `@places/clients`, `@places/clients/google`, etc.
+### `jobs/` — Trigger.dev Jobs (`@places/jobs`)
+
+Async job system for multi-source rating scraping and scheduled audits:
+- `initiate-coverage` — triggered when a place is added, scrapes all providers for the place's city
+- `audit-google` — weekly scheduled Google data refresh (hours, closed status)
+- `audit-infatuation` — monthly Infatuation re-scrape
+- `audit-beli` — biweekly Beli re-scrape
+- `audit-nyt` — monthly NYT re-scrape
 
 ## Tech Stack
 
@@ -32,9 +47,11 @@ Imported in the web app as `@places/clients`, `@places/clients/google`, etc.
 - **Next.js 16** (App Router) + TypeScript
 - **Tailwind CSS v4** (via `@tailwindcss/postcss`)
 - **Drizzle ORM** + **Neon** serverless Postgres
+- **Trigger.dev v4** for async jobs and scheduled tasks
 - **Mapbox GL JS** via `react-map-gl` v8 (import from `react-map-gl/mapbox`)
 - **Google Places API v1** (New API, not legacy)
 - **TravelTime API** for isochrones
+- **Oxylabs** proxy for scraping (optional, via `undici` ProxyAgent)
 - **jose** for JWT session cookies
 - Single-user auth (password → JWT cookie)
 
@@ -49,40 +66,59 @@ All commands run from the **repo root** (they proxy to `@places/web` via `pnpm -
 - `pnpm db:migrate` — Run pending migrations
 - `pnpm db:studio` — Open Drizzle Studio (DB browser)
 
-For the clients package specifically:
+For other packages:
 - `pnpm --filter @places/clients typecheck` — Type-check clients
+- `cd jobs && pnpm dev` — Start Trigger.dev dev server
+- `npx tsx scripts/seed-cities.ts` — Seed cities table
 
 ## Architecture
 
-- **All state lives in `apps/web/src/app/page.tsx`** — it's a client component that fetches places/tags on mount and passes them down. No server components beyond layout and login.
+- **All state lives in `apps/web/src/app/page.tsx`** — it's a client component that fetches places/tags/cities on mount and passes them down. No server components beyond layout and login.
 - **API routes** are thin wrappers around Drizzle queries. All marked `force-dynamic`.
-- **DB connection** (`apps/web/src/db/index.ts`) uses a lazy Proxy pattern to avoid build-time errors when `DATABASE_URL` isn't set.
-- **Auth middleware** (`apps/web/src/middleware.ts`) checks JWT on every request except `/login`. Note: Next.js 16 shows a deprecation warning about middleware → proxy, but it still works.
+- **DB schema** lives in `packages/db/src/schema.ts`. Web app re-exports from `@places/db/schema`.
+- **DB connection** (`packages/db/src/index.ts`) uses a lazy Proxy pattern to avoid build-time errors when `DATABASE_URL` isn't set.
+- **Auth middleware** (`apps/web/src/middleware.ts`) checks JWT on every request except `/login`.
 - **Map component** is loaded with `next/dynamic` (SSR disabled) since Mapbox requires the DOM.
+- **Cities** are first-class entities with per-city provider coverage config. Places have `cityId` FK → `cities`.
+- **Place audits** (`place_audits` table) track when each provider was last scraped per place, with `next_audit_at` for scheduling.
+- **Trigger.dev** tasks handle async scraping. POST `/api/places` fires `initiate-coverage` after creating a place.
 
 ## Key Patterns
 
 - **Google Places API v1**: Uses `X-Goog-Api-Key` and `X-Goog-FieldMask` headers, not query params. Autocomplete is limited to 5 `includedPrimaryTypes`.
-- **Filters**: Defined in `apps/web/src/components/Sidebar.tsx` (`Filters` type, `applyFilters` function). Applied to both map pins and sidebar list.
+- **Filters**: Defined in `apps/web/src/components/Sidebar.tsx` (`Filters` type, `applyFilters` function). City filter uses `cityId` (number). Applied to both map pins and sidebar list.
 - **Isochrone**: Point-in-polygon check runs client-side against GeoJSON returned from TravelTime.
 - **Duplicate detection**: `AddPlaceModal` receives `existingPlaces` and checks `googlePlaceId` before allowing save.
-- **Review clients**: All clients in `packages/clients/src/` follow the factory pattern (`createXClient(config)`) and return a common `SearchResult`/`LookupResult` interface.
+- **City auto-detection**: After Google lookup returns lat/lng, `AddPlaceModal` calls `GET /api/cities/closest` to auto-select the nearest city. Includes inline city creation.
+- **Review clients**: All clients in `packages/clients/src/` follow the factory pattern (`createXClient(config)`) and return a common `SearchResult`/`LookupResult` interface. All accept optional `proxyUrl`.
+- **Provider modules**: `jobs/src/providers/` encapsulate scraping logic per source. Both `initiate-coverage` and audit tasks use the same modules.
 
 ## Environment Variables
 
 ```
-DATABASE_URL          # Neon Postgres connection string
-AUTH_PASSWORD         # The login password (plain text, compared directly)
-AUTH_SECRET           # Random string for signing JWT cookies (openssl rand -base64 32)
+# Web app (Vercel)
+DATABASE_URL              # Neon Postgres connection string
+AUTH_PASSWORD             # The login password (plain text, compared directly)
+AUTH_SECRET               # Random string for signing JWT cookies
 NEXT_PUBLIC_MAPBOX_TOKEN  # Mapbox public access token
 GOOGLE_PLACES_API_KEY     # Google Cloud API key with Places API (New) enabled
 TRAVELTIME_APP_ID         # TravelTime API app ID
 TRAVELTIME_API_KEY        # TravelTime API key
+TRIGGER_SECRET_KEY        # Trigger.dev SDK auth
+
+# Trigger.dev jobs
+DATABASE_URL              # Neon Postgres connection string
+GOOGLE_PLACES_API_KEY     # Google audit task
+BELI_PHONE_NUMBER         # Beli client auth
+BELI_PASSWORD             # Beli client auth
+BELI_USER_ID              # Beli client auth
+OXYLABS_USERNAME          # Proxy (optional)
+OXYLABS_PASSWORD          # Proxy (optional)
 ```
 
 ## Database
 
-Schema is in `apps/web/src/db/schema.ts`. Four tables: `places`, `tags`, `place_tags` (junction), `place_ratings`. After schema changes, run `pnpm db:generate` then `pnpm db:migrate` (or `db:push` for quick iteration).
+Schema is in `packages/db/src/schema.ts`. Six tables: `cities`, `places`, `tags`, `place_tags` (junction), `place_ratings`, `place_audits`. After schema changes, run `pnpm db:generate` then `pnpm db:migrate` (or `db:push` for quick iteration). Drizzle config points to `../../packages/db/src/schema.ts`.
 
 ## Visual Design
 

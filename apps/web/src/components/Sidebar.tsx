@@ -1,6 +1,6 @@
 "use client";
 
-import { Place, Tag, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, City, STATUS_OPTIONS, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 import ReviewBanner from "./ReviewBanner";
 import { useState, useMemo } from "react";
@@ -9,6 +9,7 @@ import type { TravelTimeBand } from "@/app/page";
 interface SidebarProps {
   places: Place[];
   tags: Tag[];
+  cities: City[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
   onOpenAdd: () => void;
@@ -27,7 +28,7 @@ export interface Filters {
   status: string[];
   tagIds: number[];
   placeTypes: string[];
-  city: string;
+  cityId: number | null;
   neighborhood: string;
   cuisine: string;
   priceRange: number[];
@@ -39,7 +40,7 @@ export const DEFAULT_FILTERS: Filters = {
   status: ["want_to_try", "been_there"],
   tagIds: [],
   placeTypes: [],
-  city: "",
+  cityId: null,
   neighborhood: "",
   cuisine: "",
   priceRange: [],
@@ -113,11 +114,7 @@ export function applyFilters(places: Place[], filters: Filters): Place[] {
     )
       return false;
 
-    if (
-      filters.city &&
-      (!p.city || !p.city.toLowerCase().includes(filters.city.toLowerCase()))
-    )
-      return false;
+    if (filters.cityId !== null && p.cityId !== filters.cityId) return false;
 
     if (
       filters.neighborhood &&
@@ -156,6 +153,7 @@ export function applyFilters(places: Place[], filters: Filters): Place[] {
 export default function Sidebar({
   places,
   tags,
+  cities,
   selectedPlace,
   onSelectPlace,
   onOpenAdd,
@@ -175,11 +173,6 @@ export default function Sidebar({
     [places, filters]
   );
 
-  const cities = useMemo(() => {
-    const set = new Set(places.map((p) => p.city).filter(Boolean) as string[]);
-    return Array.from(set).sort();
-  }, [places]);
-
   const neighborhoods = useMemo(() => {
     const set = new Set(
       places.map((p) => p.neighborhood).filter(Boolean) as string[]
@@ -191,7 +184,7 @@ export default function Sidebar({
     filters.status.length +
     filters.tagIds.length +
     filters.placeTypes.length +
-    (filters.city ? 1 : 0) +
+    (filters.cityId !== null ? 1 : 0) +
     (filters.neighborhood ? 1 : 0) +
     (filters.cuisine ? 1 : 0) +
     filters.priceRange.length +
@@ -412,16 +405,19 @@ export default function Sidebar({
                 City
               </p>
               <select
-                value={filters.city}
+                value={filters.cityId ?? ""}
                 onChange={(e) =>
-                  onFiltersChange({ ...filters, city: e.target.value })
+                  onFiltersChange({
+                    ...filters,
+                    cityId: e.target.value ? parseInt(e.target.value) : null,
+                  })
                 }
                 className="block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2 py-1.5 text-xs text-[var(--color-sidebar-text)]"
               >
                 <option value="">All</option>
                 {cities.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                  <option key={c.id} value={c.id}>
+                    {c.name}
                   </option>
                 ))}
               </select>

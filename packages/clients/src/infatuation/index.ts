@@ -1,4 +1,5 @@
 import type { SearchResult, LookupResult } from "../types.js";
+import { createFetch } from "../proxy";
 
 const CONTENTFUL_ENDPOINT =
   "https://graphql.contentful.com/content/v1/spaces/by7j1x5pisip/environments/master";
@@ -22,16 +23,18 @@ function mapPrice(code: string | null | undefined): number | null {
 export interface InfatuationClientConfig {
   /** Optional override for Contentful token (default: public token) */
   contentfulToken?: string;
+  proxyUrl?: string;
 }
 
 export function createInfatuationClient(config?: InfatuationClientConfig) {
   const token = config?.contentfulToken ?? CONTENTFUL_TOKEN;
+  const fetchFn = createFetch(config?.proxyUrl);
 
   async function searchPSS(
     query: string,
-    options?: { city?: string }
+    options?: { canonicalPath?: string }
   ): Promise<SearchResult[]> {
-    const canonicalPath = options?.city ?? "";
+    const canonicalPath = options?.canonicalPath ?? "";
 
     const graphqlQuery = `
       query getPredictiveSearch($query: String!, $canonicalPath: String!, $enableSitewideSearch: Boolean!) {
@@ -70,7 +73,7 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
       }
     `;
 
-    const res = await fetch(PSS_ENDPOINT, {
+    const res = await fetchFn(PSS_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -78,7 +81,7 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
         variables: {
           query,
           canonicalPath,
-          enableSitewideSearch: !options?.city,
+          enableSitewideSearch: true,
         },
       }),
     });
@@ -151,18 +154,15 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
             perfectForCollection(limit: 6, where: { name_exists: true }) {
               items { name }
             }
-            badgeCollection {
-              items { name }
-            }
             contributorCollection(limit: 5) {
-              items { name slug }
+              items { name slug { name } }
             }
           }
         }
       }
     `;
 
-    const res = await fetch(CONTENTFUL_ENDPOINT, {
+    const res = await fetchFn(CONTENTFUL_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -216,11 +216,48 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
     };
   }
 
+  async function listCities(): Promise<{ name: string; slug: string }[]> {
+    const graphqlQuery = `
+      query {
+        cityCollection(limit: 500) {
+          items {
+            name
+            cityPath
+          }
+        }
+      }
+    `;
+
+    const res = await fetchFn(CONTENTFUL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query: graphqlQuery }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Infatuation Contentful listCities error: ${text}`);
+    }
+
+    const data = await res.json();
+    const items = data?.data?.cityCollection?.items ?? [];
+
+    return items.map((item: { name: string; cityPath: string }) => ({
+      name: item.name,
+      slug: item.cityPath,
+    }));
+  }
+
   return {
     /** Search via PSS (Post Search Service) — returns standardized SearchResult[] */
     search: searchPSS,
     /** Lookup a review by slug via Contentful — returns standardized LookupResult */
     lookup: lookupBySlug,
+    /** List all cities available on The Infatuation */
+    listCities,
   };
 }
 

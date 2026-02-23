@@ -47,7 +47,7 @@ export default function PlaceDetail({
   const reviewLinks = generateReviewLinks(
     place.name,
     place.address,
-    place.city
+    place.cityName
   );
 
   const hoursDescriptions =
@@ -229,13 +229,13 @@ export default function PlaceDetail({
               </p>
             </div>
           )}
-          {place.city && (
+          {place.cityName && (
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
                 City
               </p>
               <p className="mt-0.5 text-sm text-[var(--color-ink)]">
-                {place.city}
+                {place.cityName}
               </p>
             </div>
           )}

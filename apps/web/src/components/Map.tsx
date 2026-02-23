@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import MapGL, {
   Marker,
   Popup,
@@ -39,6 +39,8 @@ interface MapProps {
   isochroneGeoJson?: GeoJSON.FeatureCollection | null;
   isochroneOrigin?: { lat: number; lng: number } | null;
   travelTimes?: Map<number, TravelTimeBand>;
+  flyTo?: { lat: number; lng: number } | null;
+  previewPin?: { lat: number; lng: number; name: string } | null;
 }
 
 export default function Map({
@@ -49,8 +51,20 @@ export default function Map({
   isochroneGeoJson,
   isochroneOrigin,
   travelTimes,
+  flyTo,
+  previewPin,
 }: MapProps) {
   const mapRef = useRef<MapRef>(null);
+
+  useEffect(() => {
+    if (flyTo && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [flyTo.lng, flyTo.lat],
+        zoom: 14,
+        duration: 1500,
+      });
+    }
+  }, [flyTo]);
 
   const handleClick = useCallback(
     (e: mapboxgl.MapLayerMouseEvent) => {
@@ -202,6 +216,36 @@ export default function Map({
             )}
           </div>
         </Popup>
+      )}
+      {/* Preview pin for unsaved place from AddPlaceModal */}
+      {previewPin && (
+        <Marker
+          longitude={previewPin.lng}
+          latitude={previewPin.lat}
+          anchor="bottom"
+        >
+          <div className="flex flex-col items-center animate-bounce-in">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-full text-sm"
+              style={{
+                backgroundColor: "#faf6f1",
+                border: "2.5px dashed #c47d2e",
+                boxShadow: "0 0 0 2px #c47d2e, 0 2px 8px rgba(196,125,46,0.3)",
+              }}
+            >
+              {"\u{1F4CD}"}
+            </div>
+            <div
+              className="h-0 w-0"
+              style={{
+                borderLeft: "5px solid transparent",
+                borderRight: "5px solid transparent",
+                borderTop: "5px solid #c47d2e",
+                marginTop: "-1px",
+              }}
+            />
+          </div>
+        </Marker>
       )}
     </MapGL>
   );

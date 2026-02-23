@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Tag,
   Place,
+  City,
   PLACE_TYPES,
   STATUS_OPTIONS,
   GOOGLE_TYPE_MAP,
@@ -44,8 +45,11 @@ interface AddPlaceModalProps {
   onClose: () => void;
   onSave: () => void;
   tags: Tag[];
+  cities: City[];
   existingPlaces: Place[];
   onCreateTag: (name: string) => Promise<Tag>;
+  onCityCreated: () => void;
+  onPlacePreview?: (location: { lat: number; lng: number; name: string } | null) => void;
 }
 
 export default function AddPlaceModal({
@@ -53,8 +57,11 @@ export default function AddPlaceModal({
   onClose,
   onSave,
   tags,
+  cities,
   existingPlaces,
   onCreateTag,
+  onCityCreated,
+  onPlacePreview,
 }: AddPlaceModalProps) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GoogleSuggestion[]>([]);
@@ -67,13 +74,20 @@ export default function AddPlaceModal({
   const [status, setStatus] = useState("want_to_try");
   const [placeType, setPlaceType] = useState("");
   const [cuisineType, setCuisineType] = useState("");
-  const [city, setCity] = useState("");
+  const [cityId, setCityId] = useState<number | null>(null);
   const [neighborhood, setNeighborhood] = useState("");
   const [notes, setNotes] = useState("");
   const [source, setSource] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Inline city creation
+  const [showNewCity, setShowNewCity] = useState(false);
+  const [newCityName, setNewCityName] = useState("");
+  const [newCityCountry, setNewCityCountry] = useState("US");
+  const [creatingCity, setCreatingCity] = useState(false);
+  const [cityWarning, setCityWarning] = useState<string | null>(null);
 
   // Track whether we're actively typing (vs having just selected a suggestion)
   const justSelectedRef = useRef(false);
@@ -122,6 +136,7 @@ export default function AddPlaceModal({
       });
       const data: PlaceDetails = await res.json();
       setDetails(data);
+      onPlacePreview?.({ lat: data.lat, lng: data.lng, name: data.name });
 
       // Check for duplicate
       const existing = existingPlaces.find(
@@ -141,16 +156,80 @@ export default function AddPlaceModal({
         if (fallback) setPlaceType(GOOGLE_TYPE_MAP[fallback]);
       }
 
-      // Auto-fill city and neighborhood from Google address components
-      if (data.city) setCity(data.city);
+      // Auto-fill neighborhood from Google address components
       if (data.neighborhood) setNeighborhood(data.neighborhood);
 
       // Auto-fill cuisine from Google types
       if (data.cuisineTypes.length > 0) {
         setCuisineType(data.cuisineTypes.join(", "));
       }
+
+      // Auto-detect closest city
+      if (data.lat && data.lng) {
+        try {
+          const closestRes = await fetch(
+            `/api/cities/closest?lat=${data.lat}&lng=${data.lng}`
+          );
+          const closestData = await closestRes.json();
+          if (closestData.city) {
+            setCityId(closestData.city.id);
+            setShowNewCity(false);
+          } else {
+            // No nearby city — prompt to create one
+            setCityId(null);
+            if (data.city) {
+              setNewCityName(data.city);
+              setShowNewCity(true);
+            }
+          }
+        } catch {
+          // Silently fail city auto-detection
+        }
+      }
     } finally {
       setLoadingDetails(false);
+    }
+  }
+
+  async function handleCreateCity() {
+    if (!newCityName.trim()) return;
+    setCityWarning(null);
+    setCreatingCity(true);
+    try {
+      const res = await fetch("/api/cities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newCityName.trim(),
+          country: newCityCountry || "US",
+          placeLat: details?.lat,
+          placeLng: details?.lng,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setCityWarning(err.error || "Failed to create city");
+        return;
+      }
+      const newCity = await res.json();
+
+      // Warn on name mismatch (city was still created, just flagging it)
+      if (
+        newCity.geocodedName &&
+        newCity.geocodedName.toLowerCase() !== newCityName.trim().toLowerCase()
+      ) {
+        setCityWarning(
+          `Google resolved "${newCityName.trim()}" to "${newCity.geocodedName}"`
+        );
+      }
+
+      setCityId(newCity.id);
+      setShowNewCity(false);
+      setNewCityName("");
+      setNewCityCountry("US");
+      onCityCreated();
+    } finally {
+      setCreatingCity(false);
     }
   }
 
@@ -173,7 +252,7 @@ export default function AddPlaceModal({
           address: details.address,
           lat: details.lat,
           lng: details.lng,
-          city: city || null,
+          cityId: cityId || null,
           neighborhood: neighborhood || null,
           placeType: placeType || null,
           cuisineType: cuisineType
@@ -204,16 +283,21 @@ export default function AddPlaceModal({
     setQuery("");
     setSuggestions([]);
     setDetails(null);
+    onPlacePreview?.(null);
     setDuplicateWarning(null);
     setStatus("want_to_try");
     setPlaceType("");
     setCuisineType("");
-    setCity("");
+    setCityId(null);
     setNeighborhood("");
     setNotes("");
     setSource("");
     setSelectedTagIds([]);
     setNewTagName("");
+    setShowNewCity(false);
+    setNewCityName("");
+    setNewCityCountry("US");
+    setCityWarning(null);
   }
 
   if (!open) return null;
@@ -393,11 +477,77 @@ export default function AddPlaceModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>City</label>
-                  <input
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className={inputClass}
-                  />
+                  {!showNewCity ? (
+                    <select
+                      value={cityId ?? ""}
+                      onChange={(e) => {
+                        setCityWarning(null);
+                        if (e.target.value === "__new__") {
+                          setShowNewCity(true);
+                          setCityId(null);
+                        } else {
+                          setCityId(
+                            e.target.value ? parseInt(e.target.value) : null
+                          );
+                        }
+                      }}
+                      className={inputClass}
+                    >
+                      <option value="">Select...</option>
+                      {(details
+                        ? cities.filter((c) => {
+                            const dLat = details.lat - c.lat;
+                            const dLng = details.lng - c.lng;
+                            return Math.sqrt(dLat * dLat + dLng * dLng) * 69 <= 50;
+                          })
+                        : cities
+                      ).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                      <option value="__new__">+ New city</option>
+                    </select>
+                  ) : (
+                    <div className="mt-1 space-y-1.5">
+                      <input
+                        value={newCityName}
+                        onChange={(e) => setNewCityName(e.target.value)}
+                        className="block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                        placeholder="City name"
+                        autoFocus
+                        autoComplete="off"
+                        data-1p-ignore
+                      />
+                      <input
+                        value={newCityCountry}
+                        onChange={(e) => setNewCityCountry(e.target.value)}
+                        className="block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                        placeholder="Country code (US)"
+                        autoComplete="off"
+                        data-1p-ignore
+                      />
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={handleCreateCity}
+                          disabled={creatingCity || !newCityName.trim()}
+                          className="rounded-md bg-[var(--color-amber)] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[var(--color-amber-light)] disabled:opacity-50"
+                        >
+                          {creatingCity ? "..." : "Create"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowNewCity(false);
+                            setNewCityName("");
+                            setNewCityCountry("US");
+                          }}
+                          className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className={labelClass}>Neighborhood</label>
@@ -408,6 +558,12 @@ export default function AddPlaceModal({
                   />
                 </div>
               </div>
+
+              {cityWarning && (
+                <div className="rounded-lg border border-[var(--color-amber)]/30 bg-[var(--color-amber)]/10 px-3.5 py-2.5 text-sm text-[var(--color-amber)]">
+                  {cityWarning}
+                </div>
+              )}
 
               <div>
                 <label className={labelClass}>Cuisine (comma-separated)</label>
@@ -500,7 +656,7 @@ export default function AddPlaceModal({
           <div className="sticky bottom-0 rounded-b-xl border-t border-[#e0d6ca] bg-[var(--color-parchment)] p-4">
             <button
               onClick={handleSave}
-              disabled={saving || !!duplicateWarning}
+              disabled={saving || !!duplicateWarning || !cityId}
               className="w-full rounded-lg bg-[var(--color-amber)] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[var(--color-amber-light)] disabled:opacity-50"
             >
               {saving

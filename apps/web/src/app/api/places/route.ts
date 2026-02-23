@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { places, placeTags, placeRatings, tags } from "@/db/schema";
+import { places, placeTags, placeRatings, tags, cities } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { tasks } from "@trigger.dev/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,10 @@ export async function GET() {
 
   const allRatings = await db.select().from(placeRatings);
 
+  // Fetch cities for joining
+  const allCities = await db.select().from(cities);
+  const cityMap = new Map(allCities.map((c) => [c.id, c]));
+
   const tagsByPlace = new Map<number, Array<{ id: number; name: string; color: string }>>();
   for (const pt of allPlaceTags) {
     const arr = tagsByPlace.get(pt.placeId) || [];
@@ -36,6 +41,7 @@ export async function GET() {
 
   const result = allPlaces.map((p) => ({
     ...p,
+    cityName: p.cityId ? (cityMap.get(p.cityId)?.name ?? null) : null,
     tags: tagsByPlace.get(p.id) || [],
     ratings: ratingsByPlace.get(p.id) || [],
   }));
@@ -72,6 +78,14 @@ export async function POST(request: NextRequest) {
       notes: googleRatingCount ? `${googleRatingCount} reviews` : null,
       lastFetched: new Date(),
     });
+  }
+
+  // Fire-and-forget: trigger async coverage scraping
+  try {
+    await tasks.trigger("initiate-coverage", { placeId: newPlace.id });
+  } catch (err) {
+    // Don't fail place creation if trigger fails
+    console.error("[places/POST] Failed to trigger initiate-coverage:", err);
   }
 
   return NextResponse.json(newPlace, { status: 201 });

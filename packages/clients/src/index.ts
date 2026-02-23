@@ -8,6 +8,9 @@ export { createBeliClient } from "./beli/index.js";
 export type { BeliClient, BeliClientConfig, BeliTokens } from "./beli/index.js";
 
 export { createNytClient } from "./nyt/index.js";
-export type { NytClient } from "./nyt/index.js";
+export type { NytClient, NytClientConfig } from "./nyt/index.js";
+
+export { createFetch } from "./proxy";
+export type { ProxyConfig } from "./proxy";
 
 export type { SearchResult, LookupResult } from "./types.js";

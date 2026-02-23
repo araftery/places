@@ -7,10 +7,10 @@ export interface ReviewLink {
 export function generateReviewLinks(
   name: string,
   address?: string | null,
-  city?: string | null
+  cityName?: string | null
 ): ReviewLink[] {
   const query = encodeURIComponent(
-    `${name}${city ? ` ${city}` : ""}`
+    `${name}${cityName ? ` ${cityName}` : ""}`
   );
   const fullQuery = encodeURIComponent(
     `${name}${address ? ` ${address}` : ""}`

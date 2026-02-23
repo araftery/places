@@ -1,4 +1,5 @@
 import type { SearchResult, LookupResult } from "../types.js";
+import { createFetch } from "../proxy";
 
 const BASE_URL = "https://places.googleapis.com/v1/places";
 
@@ -60,10 +61,12 @@ export function mapPriceLevel(level?: string): number | null {
 
 export interface GoogleClientConfig {
   apiKey: string;
+  proxyUrl?: string;
 }
 
 export function createGoogleClient(config: GoogleClientConfig) {
   const { apiKey } = config;
+  const fetchFn = createFetch(config.proxyUrl);
 
   async function autocomplete(
     input: string,
@@ -92,7 +95,7 @@ export function createGoogleClient(config: GoogleClientConfig) {
       };
     }
 
-    const res = await fetch(
+    const res = await fetchFn(
       "https://places.googleapis.com/v1/places:autocomplete",
       {
         method: "POST",
@@ -133,7 +136,7 @@ export function createGoogleClient(config: GoogleClientConfig) {
       "addressComponents",
     ].join(",");
 
-    const res = await fetch(`${BASE_URL}/${placeId}`, {
+    const res = await fetchFn(`${BASE_URL}/${placeId}`, {
       headers: {
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": fields,

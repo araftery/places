@@ -1,0 +1,25 @@
+{
+  "name": "@places/jobs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx trigger.dev@latest dev",
+    "deploy": "npx trigger.dev@latest deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:live": "npx tsx src/live/google.live.ts && npx tsx src/live/beli.live.ts && npx tsx src/live/infatuation.live.ts && npx tsx src/live/nyt.live.ts"
+  },
+  "dependencies": {
+    "@places/clients": "workspace:*",
+    "@places/db": "workspace:*",
+    "@trigger.dev/sdk": "^4.0.0",
+    "drizzle-orm": "^0.45.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "dotenv": "^16.4.7",
+    "typescript": "5.9.3",
+    "vitest": "^3.1.1"
+  }
+}

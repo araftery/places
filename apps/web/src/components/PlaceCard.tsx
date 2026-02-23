@@ -70,7 +70,7 @@ export default function PlaceCard({
       {place.neighborhood && (
         <p className="mt-0.5 text-xs text-[var(--color-sidebar-muted)]">
           {place.neighborhood}
-          {place.city ? `, ${place.city}` : ""}
+          {place.cityName ? `, ${place.cityName}` : ""}
         </p>
       )}
 

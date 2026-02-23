@@ -1,4 +1,5 @@
 import type { SearchResult, LookupResult } from "../types.js";
+import { createFetch } from "../proxy";
 
 const GRAPHQL_ENDPOINT = "https://samizdat-graphql.nytimes.com/graphql/v2";
 
@@ -53,7 +54,12 @@ interface NytEdge {
   };
 }
 
-export function createNytClient() {
+export interface NytClientConfig {
+  proxyUrl?: string;
+}
+
+export function createNytClient(config?: NytClientConfig) {
+  const fetchFn = createFetch(config?.proxyUrl);
   async function searchDining(
     query: string,
     options?: { limit?: number }
@@ -71,7 +77,7 @@ export function createNytClient() {
       }),
     });
 
-    const res = await fetch(`${GRAPHQL_ENDPOINT}?${params.toString()}`, {
+    const res = await fetchFn(`${GRAPHQL_ENDPOINT}?${params.toString()}`, {
       method: "GET",
       headers: {
         "nyt-app-type": "project-vi",
@@ -136,7 +142,7 @@ export function createNytClient() {
       }),
     });
 
-    const res = await fetch(`${GRAPHQL_ENDPOINT}?${params.toString()}`, {
+    const res = await fetchFn(`${GRAPHQL_ENDPOINT}?${params.toString()}`, {
       method: "GET",
       headers: {
         "nyt-app-type": "project-vi",

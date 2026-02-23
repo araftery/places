@@ -83,7 +83,7 @@ export default function ReviewBanner({
                       {place.neighborhood && (
                         <p className="truncate text-[10px] text-[var(--color-sidebar-muted)]">
                           {place.neighborhood}
-                          {place.city ? `, ${place.city}` : ""}
+                          {place.cityName ? `, ${place.cityName}` : ""}
                         </p>
                       )}
                     </button>
@@ -129,7 +129,7 @@ export default function ReviewBanner({
                       {place.neighborhood && (
                         <p className="truncate text-[10px] text-[var(--color-sidebar-muted)]">
                           {place.neighborhood}
-                          {place.city ? `, ${place.city}` : ""}
+                          {place.cityName ? `, ${place.cityName}` : ""}
                         </p>
                       )}
                     </button>
