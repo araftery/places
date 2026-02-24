@@ -125,9 +125,13 @@ Shared helper `mapGoogleDetailsToPlace()` in `apps/web/src/lib/google-places.ts`
 - **Map pins**: When Discover tab is active, My Places pins are hidden. Discover pins use cream background (`#faf6f1`) with solid borders — amber for new restaurants, slate-blue for already-in-list.
 - **"Already in list" detection**: Matches by Infatuation review slug in `place_ratings.externalId` (source: `"infatuation"`), with name fallback. Uses slate-blue accent color in both map pins and sidebar cards.
 - **Isochrone integration**: Discover restaurants filter to those within the isochrone polygon. Travel time bands display on cards. Sort-by-nearest auto-activates when isochrone is active.
-- **Auto-open PlaceDetail**: Clicking an in-list card opens the matching place's detail panel. Newly added places auto-open after the places list refreshes (via `pendingOpenPlaceId` state + effect).
-- **Tab system**: Both `Sidebar` and `MobileBottomSheet` render "My Places" / "Discover" tabs. Switching to "My Places" clears discover pins. A `tabMountedRef` prevents clearing pins when the component re-mounts (e.g., closing PlaceDetail).
-- **Pin ↔ card selection**: Index mapping between sorted restaurant list and pin list computed via `useMemo` from `sortedRestaurants`. Clicking a map pin scrolls to and highlights the sidebar card, and vice versa.
+- **Auto-open PlaceDetail**: Clicking an in-list card or in-list map pin opens the matching place's detail panel. Newly added places auto-open after the places list refreshes (via `pendingOpenPlaceId` state + effect). `DiscoverPin` includes `matchedPlaceId` for in-list pins so the map click can resolve the Place without going through DiscoverPanel.
+- **Tab system**: `activeTab` state is lifted to `page.tsx` and passed as props to both `Sidebar` and `MobileBottomSheet`. This ensures tab state survives across PlaceDetail open/close. Switching to "My Places" clears discover pins (via effect in `page.tsx` with `tabMountedRef` guard to skip initial mount).
+- **MobileBottomSheet persistence**: MobileBottomSheet is always mounted but hidden via CSS (`className={showDetail ? "hidden" : ""}`) rather than conditionally rendered. This preserves DiscoverPanel state (selected guide, loaded restaurants, pins) when PlaceDetail opens and closes.
+- **Pin ↔ card selection**: Index mapping between sorted restaurant list and pin list computed via `useMemo` from `sortedRestaurants`. Clicking a map pin scrolls to and highlights the sidebar card, and vice versa. Cards have `scroll-mt-12` to clear the sticky "< Guides" header during auto-scroll.
+- **Map click behavior**: Clicking blank map closes PlaceDetail and deselects pins/places (handled in `handleMapClick` in `page.tsx`). In discover mode, clicking a non-in-list pin closes any open detail; clicking an in-list pin opens PlaceDetail for the matched place.
+- **Sticky guide header**: The "< Guides" back button in DiscoverPanel uses `sticky -top-3` with `bg-[var(--color-sidebar-bg)]` to stay visible while scrolling through restaurants.
+- **Mobile map behavior**: Popups/tooltips are not rendered on mobile (detected via `isMobile` state in Map component). FlyTo padding varies by context: 80% for discover panel (expanded at `top-[20vh]`), 50% for PlaceDetail (`max-h-[70vh]`), 25% for collapsed bottom sheet.
 
 ## Environment Variables
 

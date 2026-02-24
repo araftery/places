@@ -33,6 +33,8 @@ interface MobileBottomSheetProps {
   onDiscoverPinsChange?: (pins: DiscoverPin[]) => void;
   selectedDiscoverIndex?: number | null;
   onSelectDiscoverIndex?: (index: number | null) => void;
+  activeTab: "places" | "discover";
+  onActiveTabChange: (tab: "places" | "discover") => void;
 }
 
 export default function MobileBottomSheet({
@@ -59,12 +61,13 @@ export default function MobileBottomSheet({
   onDiscoverPinsChange,
   selectedDiscoverIndex,
   onSelectDiscoverIndex,
+  activeTab,
+  onActiveTabChange,
 }: MobileBottomSheetProps) {
   const [expanded, setExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [preSortBy, setPreSortBy] = useState<SortOption>("recent");
-  const [activeTab, setActiveTab] = useState<"places" | "discover">("places");
 
   const prevIsoRef = useRef(false);
   useEffect(() => {
@@ -108,24 +111,6 @@ export default function MobileBottomSheet({
     [selectedCityId, cities]
   );
   const hasDiscover = !!selectedCity?.infatuationSlug;
-
-  useEffect(() => {
-    if (!hasDiscover && activeTab === "discover") {
-      setActiveTab("places");
-    }
-  }, [hasDiscover]);
-
-  const tabMountedRef = useRef(false);
-  useEffect(() => {
-    // Only clear pins when actively switching away from discover, not on mount
-    if (!tabMountedRef.current) {
-      tabMountedRef.current = true;
-      return;
-    }
-    if (activeTab === "places" && onDiscoverPinsChange) {
-      onDiscoverPinsChange([]);
-    }
-  }, [activeTab]);
 
   return (
     <div
@@ -204,7 +189,7 @@ export default function MobileBottomSheet({
       {hasDiscover && (
         <div className="flex gap-4 px-4 pb-2">
           <button
-            onClick={() => setActiveTab("places")}
+            onClick={() => onActiveTabChange("places")}
             className={`pb-1 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
               activeTab === "places"
                 ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
@@ -214,7 +199,7 @@ export default function MobileBottomSheet({
             My Places
           </button>
           <button
-            onClick={() => setActiveTab("discover")}
+            onClick={() => onActiveTabChange("discover")}
             className={`pb-1 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
               activeTab === "discover"
                 ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"

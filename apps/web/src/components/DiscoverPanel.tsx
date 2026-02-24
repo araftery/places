@@ -12,6 +12,7 @@ export interface DiscoverPin {
   name: string;
   rating: number | null;
   alreadyInList: boolean;
+  matchedPlaceId: number | null;
 }
 
 interface DiscoverPanelProps {
@@ -260,15 +261,20 @@ export default function DiscoverPanel({
     }
     const pins: DiscoverPin[] = sortedRestaurants
       .filter((r) => r.venue.lat != null && r.venue.lng != null)
-      .map((r) => ({
-        lat: r.venue.lat!,
-        lng: r.venue.lng!,
-        name: r.venue.name || r.title,
-        rating: r.rating,
-        alreadyInList: isAlreadyInList(r),
-      }));
+      .map((r) => {
+        const inList = isAlreadyInList(r);
+        const matched = inList ? findMatchingPlace(r) : null;
+        return {
+          lat: r.venue.lat!,
+          lng: r.venue.lng!,
+          name: r.venue.name || r.title,
+          rating: r.rating,
+          alreadyInList: inList,
+          matchedPlaceId: matched?.id ?? null,
+        };
+      });
     onDiscoverPinsChange(pins);
-  }, [sortedRestaurants, isAlreadyInList]);
+  }, [sortedRestaurants, isAlreadyInList, findMatchingPlace]);
 
   const handleAdd = useCallback(
     async (restaurant: GuideRestaurant) => {
@@ -380,8 +386,8 @@ export default function DiscoverPanel({
   if (selectedGuideSlug) {
     return (
       <div className="flex flex-col">
-        {/* Header */}
-        <div className="flex items-center gap-2 px-4 pb-3">
+        {/* Header — sticky so it stays visible while scrolling */}
+        <div className="sticky -top-3 z-10 flex items-center gap-2 bg-[var(--color-sidebar-bg)] px-4 pb-3 pt-3">
           <button
             onClick={handleBack}
             className="flex items-center gap-1 text-xs text-[var(--color-amber)] transition-colors hover:text-[var(--color-amber-light)]"
@@ -449,7 +455,7 @@ export default function DiscoverPanel({
                       if (el) cardRefs.current.set(i, el);
                       else cardRefs.current.delete(i);
                     }}
-                    className="animate-fade-slide-in"
+                    className="animate-fade-slide-in scroll-mt-12"
                     style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
                   >
                     <DiscoverRestaurantCard

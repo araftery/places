@@ -34,6 +34,8 @@ interface SidebarProps {
   onDiscoverPinsChange?: (pins: DiscoverPin[]) => void;
   selectedDiscoverIndex?: number | null;
   onSelectDiscoverIndex?: (index: number | null) => void;
+  activeTab: "places" | "discover";
+  onActiveTabChange: (tab: "places" | "discover") => void;
 }
 
 export interface Filters {
@@ -233,11 +235,12 @@ export default function Sidebar({
   onDiscoverPinsChange,
   selectedDiscoverIndex,
   onSelectDiscoverIndex,
+  activeTab,
+  onActiveTabChange,
 }: SidebarProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [preSortBy, setPreSortBy] = useState<SortOption>("recent");
-  const [activeTab, setActiveTab] = useState<"places" | "discover">("places");
 
   // Auto-switch to "nearest" when isochrone activates, revert when it deactivates
   const prevIsoRef = useRef(false);
@@ -303,25 +306,6 @@ export default function Sidebar({
     [selectedCityId, cities]
   );
   const hasDiscover = !!selectedCity?.infatuationSlug;
-
-  // Reset to places tab when switching to city without discover
-  useEffect(() => {
-    if (!hasDiscover && activeTab === "discover") {
-      setActiveTab("places");
-    }
-  }, [hasDiscover]);
-
-  // Clear discover pins when switching to places tab (but not on initial mount)
-  const tabMountedRef = useRef(false);
-  useEffect(() => {
-    if (!tabMountedRef.current) {
-      tabMountedRef.current = true;
-      return;
-    }
-    if (activeTab === "places" && onDiscoverPinsChange) {
-      onDiscoverPinsChange([]);
-    }
-  }, [activeTab]);
 
   return (
     <div className="relative flex h-full flex-col bg-[var(--color-sidebar-bg)] grain">
@@ -393,7 +377,7 @@ export default function Sidebar({
         {hasDiscover && (
           <div className="mt-3 flex gap-4 border-b border-[var(--color-sidebar-border)]">
             <button
-              onClick={() => setActiveTab("places")}
+              onClick={() => onActiveTabChange("places")}
               className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
                 activeTab === "places"
                   ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
@@ -403,7 +387,7 @@ export default function Sidebar({
               My Places
             </button>
             <button
-              onClick={() => setActiveTab("discover")}
+              onClick={() => onActiveTabChange("discover")}
               className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
                 activeTab === "discover"
                   ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"

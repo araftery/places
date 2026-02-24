@@ -18,20 +18,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  console.log(`[discover/add] Looking up "${name}" near (${lat}, ${lng}), cityId=${cityId}, source="${source}"`);
+
   // 1. Find Google match via autocomplete
   const results = await autocomplete(name, { lat, lng });
   if (!results?.length) {
+    console.warn(`[discover/add] No autocomplete results for "${name}" near (${lat}, ${lng})`);
     return NextResponse.json({ matched: false });
   }
 
+  const topResults = results.slice(0, 3).map((r) => ({
+    placeId: r.placePrediction?.placeId,
+    name: r.placePrediction?.structuredFormat?.mainText?.text ?? r.placePrediction?.text?.text ?? "unknown",
+  }));
+  console.log(`[discover/add] Autocomplete returned ${results.length} results. Top: ${JSON.stringify(topResults)}`);
+
   const placeId = results[0].placePrediction?.placeId;
   if (!placeId) {
+    console.warn(`[discover/add] First autocomplete result for "${name}" has no placeId`);
     return NextResponse.json({ matched: false });
   }
 
   // 2. Get full details from Google
   const details = await getPlaceDetails(placeId);
   const mapped = mapGoogleDetailsToPlace(details);
+  console.log(`[discover/add] Google match: "${mapped.name}" at (${mapped.lat}, ${mapped.lng}), googlePlaceId=${mapped.googlePlaceId}, types=${mapped.types.join(",")}`);
+
 
   // 3. Check for duplicate googlePlaceId
   const [existing] = await db
@@ -40,6 +52,7 @@ export async function POST(request: NextRequest) {
     .where(eq(places.googlePlaceId, mapped.googlePlaceId));
 
   if (existing) {
+    console.log(`[discover/add] Duplicate: "${name}" matched existing place #${existing.id} "${existing.name}"`);
     return NextResponse.json({
       matched: true,
       duplicate: true,
@@ -97,6 +110,8 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("[discover/add] Failed to trigger initiate-coverage:", err);
   }
+
+  console.log(`[discover/add] Created place #${newPlace.id} "${newPlace.name}" (type=${placeType}, neighborhood=${mapped.neighborhood})`);
 
   return NextResponse.json({
     matched: true,

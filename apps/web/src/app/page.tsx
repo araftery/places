@@ -31,12 +31,13 @@ export default function Home() {
   const [showManageTags, setShowManageTags] = useState(false);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"places" | "discover">("places");
   const [loading, setLoading] = useState(true);
 
   // Preview pin from AddPlaceModal
   const [previewPin, setPreviewPin] = useState<{ lat: number; lng: number; name: string } | null>(null);
   // Discover pins from Infatuation guides
-  const [discoverPins, setDiscoverPins] = useState<{ lat: number; lng: number; name: string; rating: number | null; alreadyInList: boolean }[]>([]);
+  const [discoverPins, setDiscoverPins] = useState<{ lat: number; lng: number; name: string; rating: number | null; alreadyInList: boolean; matchedPlaceId: number | null }[]>([]);
   const [selectedDiscoverIndex, setSelectedDiscoverIndex] = useState<number | null>(null);
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 40.735, lng: -73.99 });
@@ -127,6 +128,30 @@ export default function Home() {
       }
     );
   }, [cities]);
+
+  // Reset to places tab when city doesn't have discover
+  const selectedCity = useMemo(
+    () => (selectedCityId ? cities.find((c) => c.id === selectedCityId) : null),
+    [selectedCityId, cities]
+  );
+  useEffect(() => {
+    if (!selectedCity?.infatuationSlug && activeTab === "discover") {
+      setActiveTab("places");
+    }
+  }, [selectedCity, activeTab]);
+
+  // Clear discover pins when switching to places tab
+  const tabMountedRef = useRef(false);
+  useEffect(() => {
+    if (!tabMountedRef.current) {
+      tabMountedRef.current = true;
+      return;
+    }
+    if (activeTab === "places") {
+      setDiscoverPins([]);
+      setSelectedDiscoverIndex(null);
+    }
+  }, [activeTab]);
 
   const filteredPlaces = useMemo(() => {
     let result = places;
@@ -264,11 +289,26 @@ export default function Home() {
   function handleSelectDiscoverIndex(index: number | null) {
     setSelectedDiscoverIndex(index);
     if (index != null && discoverPins[index]) {
-      setFlyTo({ lat: discoverPins[index].lat, lng: discoverPins[index].lng });
+      const pin = discoverPins[index];
+      setFlyTo({ lat: pin.lat, lng: pin.lng });
+      // Open detail for "already in list" places
+      if (pin.alreadyInList && pin.matchedPlaceId) {
+        const match = places.find((p) => p.id === pin.matchedPlaceId);
+        if (match) {
+          setSelectedPlace(match);
+          setShowDetail(true);
+          return;
+        }
+      }
+    }
+    // Close detail panel when selecting a non-matched pin or deselecting
+    if (showDetail) {
+      setShowDetail(false);
+      setSelectedPlace(null);
     }
   }
 
-  function handleDiscoverPinsChange(pins: { lat: number; lng: number; name: string; rating: number | null; alreadyInList: boolean }[]) {
+  function handleDiscoverPinsChange(pins: { lat: number; lng: number; name: string; rating: number | null; alreadyInList: boolean; matchedPlaceId: number | null }[]) {
     setDiscoverPins(pins);
     setSelectedDiscoverIndex(null);
   }
@@ -286,6 +326,11 @@ export default function Home() {
     // Deselect discover pin on map click
     if (selectedDiscoverIndex != null) {
       setSelectedDiscoverIndex(null);
+    }
+    // Close detail panel and deselect place on blank map click
+    if (showDetail || selectedPlace) {
+      setShowDetail(false);
+      setSelectedPlace(null);
     }
     if (isoSettings.active) {
       setIsoSettings((prev) => ({ ...prev, lat, lng }));
@@ -376,6 +421,8 @@ export default function Home() {
           onDiscoverPinsChange={handleDiscoverPinsChange}
           selectedDiscoverIndex={selectedDiscoverIndex}
           onSelectDiscoverIndex={handleSelectDiscoverIndex}
+          activeTab={activeTab}
+          onActiveTabChange={setActiveTab}
         />
       </div>
 
@@ -453,8 +500,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Mobile: Place list bottom sheet */}
-      {!showDetail && (
+      {/* Mobile: Place list bottom sheet — always mounted to preserve DiscoverPanel state */}
+      <div className={showDetail ? "hidden" : ""}>
         <MobileBottomSheet
           places={filteredPlaces}
           tags={tags}
@@ -479,8 +526,10 @@ export default function Home() {
           onDiscoverPinsChange={handleDiscoverPinsChange}
           selectedDiscoverIndex={selectedDiscoverIndex}
           onSelectDiscoverIndex={handleSelectDiscoverIndex}
+          activeTab={activeTab}
+          onActiveTabChange={setActiveTab}
         />
-      )}
+      </div>
 
       {/* Mobile: Place detail bottom sheet */}
       {showDetail && selectedPlace && (

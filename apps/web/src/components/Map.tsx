@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import MapGL, {
   Marker,
   Popup,
@@ -31,6 +31,7 @@ export interface DiscoverPin {
   name: string;
   rating: number | null;
   alreadyInList: boolean;
+  matchedPlaceId: number | null;
 }
 
 interface MapProps {
@@ -67,29 +68,49 @@ export default function Map({
   onSelectDiscoverPin,
 }: MapProps) {
   const mapRef = useRef<MapRef>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     if (flyTo && mapRef.current) {
-      const isMobile = window.innerWidth < 768;
+      // On mobile, pad the bottom so the pin lands above the bottom sheet.
+      // - PlaceDetail sheet: max-h-[70vh] → ~50% padding
+      // - Discover panel expanded: top-[20vh] → 80% padding
+      // - Normal collapsed sheet: 180px → ~25% padding
+      let bottomPad = 0;
+      if (isMobile) {
+        if (showDetail) {
+          bottomPad = Math.round(window.innerHeight * 0.5);
+        } else if (discoverPins?.length) {
+          bottomPad = Math.round(window.innerHeight * 0.8);
+        } else {
+          bottomPad = Math.round(window.innerHeight * 0.25);
+        }
+      }
       mapRef.current.flyTo({
         center: [flyTo.lng, flyTo.lat],
         zoom: flyTo.zoom ?? 14,
         duration: 1500,
-        // On mobile, pad the bottom so the pin lands above the detail sheet
-        ...(isMobile && { padding: { top: 0, bottom: Math.round(window.innerHeight * 0.5), left: 0, right: 0 } }),
+        ...(bottomPad > 0 && { padding: { top: 0, bottom: bottomPad, left: 0, right: 0 } }),
       });
     }
-  }, [flyTo]);
+  }, [flyTo, isMobile, discoverPins?.length, showDetail]);
 
   // Reset map padding when detail sheet closes on mobile
   useEffect(() => {
-    if (!showDetail && mapRef.current && window.innerWidth < 768) {
+    if (!showDetail && mapRef.current && isMobile) {
       mapRef.current.easeTo({
         padding: { top: 0, bottom: 0, left: 0, right: 0 },
         duration: 300,
       });
     }
-  }, [showDetail]);
+  }, [showDetail, isMobile]);
 
   const handleClick = useCallback(
     (e: mapboxgl.MapLayerMouseEvent) => {
@@ -213,7 +234,7 @@ export default function Map({
         );
       })}
 
-      {!discoverPins?.length && selectedPlace && (
+      {!isMobile && !discoverPins?.length && selectedPlace && (
         <Popup
           longitude={selectedPlace.lng}
           latitude={selectedPlace.lat}
@@ -331,8 +352,8 @@ export default function Map({
         );
       })}
 
-      {/* Popup for selected discover pin */}
-      {selectedDiscoverIndex != null && discoverPins?.[selectedDiscoverIndex] && (
+      {/* Popup for selected discover pin — desktop only */}
+      {!isMobile && selectedDiscoverIndex != null && discoverPins?.[selectedDiscoverIndex] && (
         <Popup
           longitude={discoverPins[selectedDiscoverIndex].lng}
           latitude={discoverPins[selectedDiscoverIndex].lat}
