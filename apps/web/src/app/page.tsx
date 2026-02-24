@@ -84,11 +84,12 @@ export default function Home() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showManageTags, setShowManageTags] = useState(false);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Preview pin from AddPlaceModal
   const [previewPin, setPreviewPin] = useState<{ lat: number; lng: number; name: string } | null>(null);
-  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
+  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 40.735, lng: -73.99 });
 
   // Isochrone state
@@ -142,12 +143,16 @@ export default function Home() {
   }, [fetchPlaces, fetchTags, fetchCities, fetchReview]);
 
   const filteredPlaces = useMemo(() => {
-    let result = applyFilters(places, filters);
+    let result = places;
+    if (selectedCityId !== null) {
+      result = result.filter((p) => p.cityId === selectedCityId);
+    }
+    result = applyFilters(result, filters);
     if (isoGeoJson) {
       result = result.filter((p) => isPlaceInIsochrone(p, isoGeoJson));
     }
     return result;
-  }, [places, filters, isoGeoJson]);
+  }, [places, selectedCityId, filters, isoGeoJson]);
 
   const travelTimes = useMemo(() => {
     const map = new Map<number, TravelTimeBand>();
@@ -158,6 +163,18 @@ export default function Home() {
     }
     return map;
   }, [filteredPlaces, isoGeoJson]);
+
+  function handleCityChange(cityId: number | null) {
+    setSelectedCityId(cityId);
+    // Clear neighborhood filter when changing city since neighborhoods are city-scoped
+    setFilters((prev) => ({ ...prev, neighborhood: "" }));
+    if (cityId !== null) {
+      const city = cities.find((c) => c.id === cityId);
+      if (city) {
+        setFlyTo({ lat: city.lat, lng: city.lng, zoom: 12 });
+      }
+    }
+  }
 
   function handleSelectPlace(place: Place | null) {
     setSelectedPlace(place);
@@ -334,7 +351,7 @@ export default function Home() {
       {/* Sidebar */}
       <div className="hidden w-[360px] shrink-0 md:block">
         <Sidebar
-          places={places}
+          places={filteredPlaces}
           tags={tags}
           cities={cities}
           selectedPlace={selectedPlace}
@@ -348,6 +365,9 @@ export default function Home() {
           reviewStale={reviewStale}
           onReviewArchive={handleReviewArchive}
           onReviewDismissClosed={handleReviewDismissClosed}
+          selectedCityId={selectedCityId}
+          onCityChange={handleCityChange}
+          isochroneActive={!!isoGeoJson}
         />
       </div>
 
@@ -439,6 +459,9 @@ export default function Home() {
           reviewStale={reviewStale}
           onReviewArchive={handleReviewArchive}
           onReviewDismissClosed={handleReviewDismissClosed}
+          selectedCityId={selectedCityId}
+          onCityChange={handleCityChange}
+          isochroneActive={!!isoGeoJson}
         />
       )}
 

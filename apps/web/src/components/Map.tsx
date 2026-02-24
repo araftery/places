@@ -34,7 +34,7 @@ interface MapProps {
   isochroneGeoJson?: GeoJSON.FeatureCollection | null;
   isochroneOrigin?: { lat: number; lng: number } | null;
   travelTimes?: Map<number, TravelTimeBand>;
-  flyTo?: { lat: number; lng: number } | null;
+  flyTo?: { lat: number; lng: number; zoom?: number } | null;
   previewPin?: { lat: number; lng: number; name: string } | null;
   showDetail?: boolean;
 }
@@ -59,7 +59,7 @@ export default function Map({
       const isMobile = window.innerWidth < 768;
       mapRef.current.flyTo({
         center: [flyTo.lng, flyTo.lat],
-        zoom: 14,
+        zoom: flyTo.zoom ?? 14,
         duration: 1500,
         // On mobile, pad the bottom so the pin lands above the detail sheet
         ...(isMobile && { padding: { top: 0, bottom: Math.round(window.innerHeight * 0.5), left: 0, right: 0 } }),

@@ -10,6 +10,7 @@ interface PlaceCardProps {
   isSelected: boolean;
   onClick: () => void;
   travelTime?: TravelTimeBand | null;
+  compact?: boolean;
 }
 
 export default function PlaceCard({
@@ -17,8 +18,80 @@ export default function PlaceCard({
   isSelected,
   onClick,
   travelTime,
+  compact,
 }: PlaceCardProps) {
   const googleRating = place.ratings?.find((r) => r.source === "google");
+
+  if (compact) {
+    return (
+      <button
+        onClick={onClick}
+        className={`group w-full rounded-lg border px-3 py-2 text-left transition-all ${
+          isSelected
+            ? "border-[var(--color-amber)]/50 bg-[var(--color-amber-dim)]"
+            : "border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] hover:border-[var(--color-sidebar-muted)]/50 hover:bg-[var(--color-sidebar-surface)]/80"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <h3
+            className={`truncate text-sm font-semibold leading-tight ${
+              isSelected
+                ? "text-[var(--color-amber-light)]"
+                : "text-[var(--color-sidebar-text)]"
+            }`}
+          >
+            {place.name}
+          </h3>
+          {place.beenThere && (
+            <svg
+              className="shrink-0 text-[var(--color-sage-light)]"
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
+        </div>
+        <div className="mt-0.5 flex items-center gap-x-1.5 text-[11px] text-[var(--color-sidebar-muted)]">
+          {place.placeType && (
+            <span className="capitalize">{place.placeType.replace("_", " ")}</span>
+          )}
+          {place.placeType && (place.priceRange || googleRating?.rating || travelTime) && (
+            <span className="text-[var(--color-sidebar-muted)]/40">&middot;</span>
+          )}
+          {place.priceRange && (
+            <span>{PRICE_LABELS[place.priceRange]}</span>
+          )}
+          {place.priceRange && (googleRating?.rating || travelTime) && (
+            <span className="text-[var(--color-sidebar-muted)]/40">&middot;</span>
+          )}
+          {googleRating?.rating && (
+            <span className="text-[var(--color-amber)]">★ {googleRating.rating}</span>
+          )}
+          {googleRating?.rating && travelTime && (
+            <span className="text-[var(--color-sidebar-muted)]/40">&middot;</span>
+          )}
+          {travelTime && (
+            <span style={{ color: travelTime.color }}>
+              &lt; {travelTime.minutes} min
+            </span>
+          )}
+          {place.closedPermanently && (
+            <>
+              <span className="text-[var(--color-sidebar-muted)]/40">&middot;</span>
+              <span className="font-semibold uppercase text-[var(--color-terracotta)]">Closed</span>
+            </>
+          )}
+        </div>
+      </button>
+    );
+  }
 
   return (
     <button

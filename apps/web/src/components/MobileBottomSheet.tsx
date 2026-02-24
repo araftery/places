@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Place, Tag, City, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 import ReviewBanner from "./ReviewBanner";
-import { Filters, DEFAULT_FILTERS, applyFilters } from "./Sidebar";
+import { Filters, DEFAULT_FILTERS, applyFilters, SortOption } from "./Sidebar";
 import type { TravelTimeBand } from "@/app/page";
 
 interface MobileBottomSheetProps {
@@ -22,6 +22,9 @@ interface MobileBottomSheetProps {
   reviewStale?: Place[];
   onReviewArchive?: (id: number) => void;
   onReviewDismissClosed?: (id: number) => void;
+  selectedCityId: number | null;
+  onCityChange: (cityId: number | null) => void;
+  isochroneActive?: boolean;
 }
 
 export default function MobileBottomSheet({
@@ -39,11 +42,51 @@ export default function MobileBottomSheet({
   reviewStale = [],
   onReviewArchive,
   onReviewDismissClosed,
+  selectedCityId,
+  onCityChange,
+  isochroneActive,
 }: MobileBottomSheetProps) {
   const [expanded, setExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>("recent");
+  const [preSortBy, setPreSortBy] = useState<SortOption>("recent");
+
+  const prevIsoRef = useRef(false);
+  useEffect(() => {
+    if (isochroneActive && !prevIsoRef.current) {
+      setPreSortBy(sortBy);
+      setSortBy("nearest");
+    }
+    if (!isochroneActive && prevIsoRef.current && sortBy === "nearest") {
+      setSortBy(preSortBy);
+    }
+    prevIsoRef.current = !!isochroneActive;
+  }, [isochroneActive]);
 
   const filteredPlaces = applyFilters(places, filters);
+
+  const sortedPlaces = useMemo(() => {
+    const sorted = [...filteredPlaces];
+    switch (sortBy) {
+      case "recent":
+        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      case "rating": {
+        const getRating = (p: Place) => p.ratings?.find((r) => r.source === "google")?.rating ?? -1;
+        sorted.sort((a, b) => getRating(b) - getRating(a));
+        break;
+      }
+      case "name":
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case "nearest": {
+        const getMinutes = (p: Place) => travelTimes?.get(p.id)?.minutes ?? Infinity;
+        sorted.sort((a, b) => getMinutes(a) - getMinutes(b));
+        break;
+      }
+    }
+    return sorted;
+  }, [filteredPlaces, sortBy, travelTimes]);
 
   return (
     <div
@@ -63,12 +106,22 @@ export default function MobileBottomSheet({
       {/* Header */}
       <div className="flex items-center justify-between px-4 pb-2">
         <div className="flex items-center gap-2">
-          <h2
-            className="text-sm font-semibold text-[var(--color-sidebar-text)]"
-            style={{ fontFamily: "var(--font-libre-baskerville)" }}
+          <select
+            value={selectedCityId ?? ""}
+            onChange={(e) => onCityChange(e.target.value ? parseInt(e.target.value) : null)}
+            className="appearance-none bg-transparent text-sm font-semibold text-[var(--color-sidebar-text)] cursor-pointer pr-5 focus:outline-none"
+            style={{
+              fontFamily: "var(--font-libre-baskerville)",
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='%238a7e72' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 0 center",
+            }}
           >
-            {filteredPlaces.length} places
-          </h2>
+            <option value="">All Cities</option>
+            {cities.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="flex items-center gap-1 rounded-md bg-[var(--color-sidebar-surface)] px-2 py-1 text-xs text-[var(--color-sidebar-muted)]"
@@ -233,16 +286,37 @@ export default function MobileBottomSheet({
         />
       )}
 
-      {/* Place list */}
+      {/* Sort + Place list */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 sidebar-scroll">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+            {sortedPlaces.length} place{sortedPlaces.length !== 1 ? "s" : ""}
+          </p>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="appearance-none bg-transparent text-[11px] font-medium text-[var(--color-sidebar-muted)] cursor-pointer pr-4 focus:outline-none"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='%238a7e72' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 0 center",
+            }}
+          >
+            <option value="recent">Recently added</option>
+            <option value="rating">Highest rated</option>
+            <option value="name">Name A–Z</option>
+            {isochroneActive && <option value="nearest">Nearest</option>}
+          </select>
+        </div>
         <div className="space-y-2">
-          {filteredPlaces.map((place) => (
+          {sortedPlaces.map((place) => (
             <PlaceCard
               key={place.id}
               place={place}
               isSelected={selectedPlace?.id === place.id}
               onClick={() => onSelectPlace(place)}
               travelTime={travelTimes?.get(place.id)}
+              compact={sortedPlaces.length >= 10}
             />
           ))}
         </div>

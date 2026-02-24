@@ -79,6 +79,7 @@ export default function AddPlaceModal({
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
 
   // Inline city creation
   const [showNewCity, setShowNewCity] = useState(false);
@@ -294,6 +295,7 @@ export default function AddPlaceModal({
     setNewCityName("");
     setNewCityCountry("US");
     setCityWarning(null);
+    setShowMoreDetails(false);
   }
 
   if (!open) return null;
@@ -422,13 +424,25 @@ export default function AddPlaceModal({
                 <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
                   {details.address}
                 </p>
-                {details.googleRating && (
-                  <p className="mt-1.5 text-sm font-medium text-[var(--color-amber)]">
-                    ★ {details.googleRating}/5
-                    {details.googleRatingCount &&
-                      ` (${details.googleRatingCount} reviews)`}
-                  </p>
-                )}
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm">
+                  {details.googleRating && (
+                    <span className="font-medium text-[var(--color-amber)]">
+                      ★ {details.googleRating}/5
+                      {details.googleRatingCount &&
+                        ` (${details.googleRatingCount})`}
+                    </span>
+                  )}
+                  {placeType && (
+                    <span className="capitalize text-[var(--color-ink-muted)]">
+                      {placeType.replace("_", " ")}
+                    </span>
+                  )}
+                  {cityId && (
+                    <span className="text-[var(--color-ink-muted)]">
+                      {cities.find((c) => c.id === cityId)?.name}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Duplicate warning */}
@@ -438,196 +452,237 @@ export default function AddPlaceModal({
                 </div>
               )}
 
-              <div>
-                <label className={labelClass}>Type</label>
-                <select
-                  value={placeType}
-                  onChange={(e) => setPlaceType(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">Select...</option>
-                  {PLACE_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* No city warning — nudge to expand */}
+              {!cityId && !showMoreDetails && (
+                <p className="text-xs text-[var(--color-ink-muted)]">
+                  No city detected.{" "}
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreDetails(true)}
+                    className="font-medium text-[var(--color-amber)] hover:text-[var(--color-amber-light)]"
+                  >
+                    Set city
+                  </button>
+                </p>
+              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>City</label>
-                  {!showNewCity ? (
+              {/* More details toggle */}
+              {!showMoreDetails ? (
+                <button
+                  type="button"
+                  onClick={() => setShowMoreDetails(true)}
+                  className="flex items-center gap-1 text-sm font-medium text-[var(--color-amber)] transition-colors hover:text-[var(--color-amber-light)]"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                  More details
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreDetails(false)}
+                    className="flex items-center gap-1 text-sm font-medium text-[var(--color-amber)] transition-colors hover:text-[var(--color-amber-light)]"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <polyline points="18 15 12 9 6 15" />
+                    </svg>
+                    Fewer details
+                  </button>
+
+                  <div>
+                    <label className={labelClass}>Type</label>
                     <select
-                      value={cityId ?? ""}
-                      onChange={(e) => {
-                        setCityWarning(null);
-                        if (e.target.value === "__new__") {
-                          setShowNewCity(true);
-                          setCityId(null);
-                        } else {
-                          setCityId(
-                            e.target.value ? parseInt(e.target.value) : null
-                          );
-                        }
-                      }}
+                      value={placeType}
+                      onChange={(e) => setPlaceType(e.target.value)}
                       className={inputClass}
                     >
                       <option value="">Select...</option>
-                      {(details
-                        ? cities.filter((c) => {
-                            const dLat = details.lat - c.lat;
-                            const dLng = details.lng - c.lng;
-                            return Math.sqrt(dLat * dLat + dLng * dLng) * 69 <= 50;
-                          })
-                        : cities
-                      ).map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
+                      {PLACE_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
                         </option>
                       ))}
-                      <option value="__new__">+ New city</option>
                     </select>
-                  ) : (
-                    <div className="mt-1 space-y-1.5">
-                      <input
-                        value={newCityName}
-                        onChange={(e) => setNewCityName(e.target.value)}
-                        className="block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                        placeholder="City name"
-                        autoFocus
-                        autoComplete="off"
-                        data-1p-ignore
-                      />
-                      <input
-                        value={newCityCountry}
-                        onChange={(e) => setNewCityCountry(e.target.value)}
-                        className="block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                        placeholder="Country code (US)"
-                        autoComplete="off"
-                        data-1p-ignore
-                      />
-                      <div className="flex gap-1.5">
-                        <button
-                          onClick={handleCreateCity}
-                          disabled={creatingCity || !newCityName.trim()}
-                          className="rounded-md bg-[var(--color-amber)] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[var(--color-amber-light)] disabled:opacity-50"
-                        >
-                          {creatingCity ? "..." : "Create"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowNewCity(false);
-                            setNewCityName("");
-                            setNewCityCountry("US");
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass}>City</label>
+                      {!showNewCity ? (
+                        <select
+                          value={cityId ?? ""}
+                          onChange={(e) => {
+                            setCityWarning(null);
+                            if (e.target.value === "__new__") {
+                              setShowNewCity(true);
+                              setCityId(null);
+                            } else {
+                              setCityId(
+                                e.target.value ? parseInt(e.target.value) : null
+                              );
+                            }
                           }}
-                          className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                          className={inputClass}
                         >
-                          Cancel
-                        </button>
-                      </div>
+                          <option value="">Select...</option>
+                          {(details
+                            ? cities.filter((c) => {
+                                const dLat = details.lat - c.lat;
+                                const dLng = details.lng - c.lng;
+                                return Math.sqrt(dLat * dLat + dLng * dLng) * 69 <= 50;
+                              })
+                            : cities
+                          ).map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                          <option value="__new__">+ New city</option>
+                        </select>
+                      ) : (
+                        <div className="mt-1 space-y-1.5">
+                          <input
+                            value={newCityName}
+                            onChange={(e) => setNewCityName(e.target.value)}
+                            className="block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                            placeholder="City name"
+                            autoFocus
+                            autoComplete="off"
+                            data-1p-ignore
+                          />
+                          <input
+                            value={newCityCountry}
+                            onChange={(e) => setNewCityCountry(e.target.value)}
+                            className="block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                            placeholder="Country code (US)"
+                            autoComplete="off"
+                            data-1p-ignore
+                          />
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={handleCreateCity}
+                              disabled={creatingCity || !newCityName.trim()}
+                              className="rounded-md bg-[var(--color-amber)] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[var(--color-amber-light)] disabled:opacity-50"
+                            >
+                              {creatingCity ? "..." : "Create"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowNewCity(false);
+                                setNewCityName("");
+                                setNewCityCountry("US");
+                              }}
+                              className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className={labelClass}>Neighborhood</label>
+                      <input
+                        value={neighborhood}
+                        onChange={(e) => setNeighborhood(e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  {cityWarning && (
+                    <div className="rounded-lg border border-[var(--color-amber)]/30 bg-[var(--color-amber)]/10 px-3.5 py-2.5 text-sm text-[var(--color-amber)]">
+                      {cityWarning}
                     </div>
                   )}
-                </div>
-                <div>
-                  <label className={labelClass}>Neighborhood</label>
-                  <input
-                    value={neighborhood}
-                    onChange={(e) => setNeighborhood(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
 
-              {cityWarning && (
-                <div className="rounded-lg border border-[var(--color-amber)]/30 bg-[var(--color-amber)]/10 px-3.5 py-2.5 text-sm text-[var(--color-amber)]">
-                  {cityWarning}
-                </div>
+                  <div>
+                    <label className={labelClass}>Cuisine (comma-separated)</label>
+                    <input
+                      value={cuisineType}
+                      onChange={(e) => setCuisineType(e.target.value)}
+                      className={inputClass}
+                      placeholder="Italian, Pizza"
+                    />
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <label className={labelClass}>Tags</label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {tags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedTagIds((prev) =>
+                              prev.includes(tag.id)
+                                ? prev.filter((id) => id !== tag.id)
+                                : [...prev, tag.id]
+                            )
+                          }
+                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                            selectedTagIds.includes(tag.id)
+                              ? "text-white"
+                              : "border border-[#d4c9bb] bg-[var(--color-cream)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                          }`}
+                          style={
+                            selectedTagIds.includes(tag.id)
+                              ? { backgroundColor: tag.color }
+                              : {}
+                          }
+                        >
+                          {tag.name}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={newTagName}
+                        onChange={(e) => setNewTagName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddTag();
+                          }
+                        }}
+                        className="flex-1 rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                        placeholder="New tag..."
+                      />
+                      <button
+                        onClick={handleAddTag}
+                        type="button"
+                        className="rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Personal Notes</label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={2}
+                      className={inputClass}
+                      placeholder="John recommended, get the pasta..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Source</label>
+                    <input
+                      value={source}
+                      onChange={(e) => setSource(e.target.value)}
+                      className={inputClass}
+                      placeholder="How you heard about it"
+                    />
+                  </div>
+                </>
               )}
-
-              <div>
-                <label className={labelClass}>Cuisine (comma-separated)</label>
-                <input
-                  value={cuisineType}
-                  onChange={(e) => setCuisineType(e.target.value)}
-                  className={inputClass}
-                  placeholder="Italian, Pizza"
-                />
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className={labelClass}>Tags</label>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {tags.map((tag) => (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() =>
-                        setSelectedTagIds((prev) =>
-                          prev.includes(tag.id)
-                            ? prev.filter((id) => id !== tag.id)
-                            : [...prev, tag.id]
-                        )
-                      }
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                        selectedTagIds.includes(tag.id)
-                          ? "text-white"
-                          : "border border-[#d4c9bb] bg-[var(--color-cream)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-                      }`}
-                      style={
-                        selectedTagIds.includes(tag.id)
-                          ? { backgroundColor: tag.color }
-                          : {}
-                      }
-                    >
-                      {tag.name}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={newTagName}
-                    onChange={(e) => setNewTagName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddTag();
-                      }
-                    }}
-                    className="flex-1 rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                    placeholder="New tag..."
-                  />
-                  <button
-                    onClick={handleAddTag}
-                    type="button"
-                    className="rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className={labelClass}>Personal Notes</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  className={inputClass}
-                  placeholder="John recommended, get the pasta..."
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>Source</label>
-                <input
-                  value={source}
-                  onChange={(e) => setSource(e.target.value)}
-                  className={inputClass}
-                  placeholder="How you heard about it"
-                />
-              </div>
             </>
           )}
         </div>
@@ -636,7 +691,7 @@ export default function AddPlaceModal({
           <div className="sticky bottom-0 rounded-b-xl border-t border-[#e0d6ca] bg-[var(--color-parchment)] p-4">
             <button
               onClick={handleSave}
-              disabled={saving || !!duplicateWarning || !cityId}
+              disabled={saving || !!duplicateWarning}
               className="w-full rounded-lg bg-[var(--color-amber)] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[var(--color-amber-light)] disabled:opacity-50"
             >
               {saving
