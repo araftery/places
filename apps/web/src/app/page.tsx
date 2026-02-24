@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import Sidebar, {
   Filters,
@@ -136,11 +136,48 @@ export default function Home() {
     }
   }, []);
 
+  const geolocatedRef = useRef(false);
+
   useEffect(() => {
     Promise.all([fetchPlaces(), fetchTags(), fetchCities(), fetchReview()]).finally(
       () => setLoading(false)
     );
   }, [fetchPlaces, fetchTags, fetchCities, fetchReview]);
+
+  // On mount, geolocate user and fly map + auto-select closest city
+  useEffect(() => {
+    if (geolocatedRef.current || !navigator.geolocation) return;
+    // Wait for cities to load before geolocating
+    if (cities.length === 0) return;
+    geolocatedRef.current = true;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setFlyTo({ lat: latitude, lng: longitude, zoom: 12 });
+
+        // Find closest city
+        let closest: City | null = null;
+        let closestDist = Infinity;
+        for (const city of cities) {
+          const dLat = city.lat - latitude;
+          const dLng = city.lng - longitude;
+          const dist = dLat * dLat + dLng * dLng;
+          if (dist < closestDist) {
+            closestDist = dist;
+            closest = city;
+          }
+        }
+        // Auto-select if within ~50 miles (~0.72 degrees)
+        if (closest && Math.sqrt(closestDist) * 69 <= 50) {
+          setSelectedCityId(closest.id);
+        }
+      },
+      () => {
+        // Geolocation denied or failed — keep default view
+      }
+    );
+  }, [cities]);
 
   const filteredPlaces = useMemo(() => {
     let result = places;

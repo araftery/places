@@ -37,6 +37,9 @@ export interface Filters {
   cuisine: string;
   priceRange: number[];
   openNow: boolean;
+  findTable: boolean;
+  findTableDate: string;
+  findTablePartySize: number;
 }
 
 export const DEFAULT_FILTERS: Filters = {
@@ -48,6 +51,9 @@ export const DEFAULT_FILTERS: Filters = {
   cuisine: "",
   priceRange: [],
   openNow: false,
+  findTable: false,
+  findTableDate: "",
+  findTablePartySize: 2,
 };
 
 interface HoursPeriod {
@@ -94,6 +100,20 @@ function isPlaceOpenNow(place: Place): boolean | null {
 
   return false;
 }
+
+function isPlaceOpenOnDay(place: Place, dayOfWeek: number): boolean | null {
+  const hours = place.hoursJson as HoursData | null | undefined;
+  if (!hours?.periods || hours.periods.length === 0) return null;
+
+  for (const period of hours.periods) {
+    if (!period.open) continue;
+    if (period.open.day === dayOfWeek) return true;
+  }
+
+  return false;
+}
+
+const NON_DINING_TYPES = ["tourist_site", "retail", "other"];
 
 export function applyFilters(places: Place[], filters: Filters): Place[] {
   return places.filter((p) => {
@@ -144,6 +164,37 @@ export function applyFilters(places: Place[], filters: Filters): Place[] {
       const openStatus = isPlaceOpenNow(p);
       // null means unknown hours — keep visible per requirements
       if (openStatus === false) return false;
+    }
+
+    if (filters.findTable && filters.findTableDate) {
+      // Exclude non-dining types
+      if (p.placeType && NON_DINING_TYPES.includes(p.placeType)) return false;
+
+      // Exclude places closed on that day
+      const targetDate = new Date(filters.findTableDate + "T12:00:00");
+      const dayOfWeek = targetDate.getDay();
+      const openOnDay = isPlaceOpenOnDay(p, dayOfWeek);
+      if (openOnDay === false) return false;
+
+      // Reservation availability logic
+      const provider = p.reservationProvider;
+      if (provider === "none") return false;
+      // walk_in or unknown provider → passes
+      if (provider === "walk_in" || !provider) {
+        // passes
+      } else {
+        // Has a booking provider — check availability window
+        const targetDateStr = filters.findTableDate;
+        if (p.lastAvailableDate) {
+          // If target is beyond last available date → passes (not yet open)
+          // If target is within → passes (might have availability)
+          // Both cases pass — we can't check live availability yet
+        } else if (p.openingWindowDays) {
+          // No lastAvailableDate but we know the window — estimate
+          // Both within and beyond window pass for now
+        }
+        // If we have no window info at all, pass (optimistic)
+      }
     }
 
     return true;
@@ -229,7 +280,8 @@ export default function Sidebar({
     (filters.neighborhood ? 1 : 0) +
     (filters.cuisine ? 1 : 0) +
     filters.priceRange.length +
-    (filters.openNow ? 1 : 0);
+    (filters.openNow ? 1 : 0) +
+    (filters.findTable ? 1 : 0);
 
   return (
     <div className="relative flex h-full flex-col bg-[var(--color-sidebar-bg)] grain">
@@ -356,6 +408,71 @@ export default function Sidebar({
             >
               Open Now
             </button>
+          </div>
+
+          {/* Find a Table */}
+          <div>
+            <button
+              onClick={() =>
+                onFiltersChange({ ...filters, findTable: !filters.findTable })
+              }
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                filters.findTable
+                  ? "bg-[var(--color-amber)] text-white"
+                  : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+              }`}
+            >
+              Find a Table
+            </button>
+            {filters.findTable && (
+              <div className="mt-2 space-y-2">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.findTableDate}
+                    onChange={(e) =>
+                      onFiltersChange({ ...filters, findTableDate: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2.5 py-1.5 text-xs text-[var(--color-sidebar-text)] focus:border-[var(--color-amber)] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                    Party Size
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          findTablePartySize: Math.max(1, filters.findTablePartySize - 1),
+                        })
+                      }
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-xs text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                    >
+                      -
+                    </button>
+                    <span className="min-w-[1.5rem] text-center text-sm font-medium text-[var(--color-sidebar-text)]">
+                      {filters.findTablePartySize}
+                    </span>
+                    <button
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          findTablePartySize: filters.findTablePartySize + 1,
+                        })
+                      }
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-xs text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Tags */}

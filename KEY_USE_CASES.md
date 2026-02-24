@@ -6,5 +6,11 @@ The key use cases of this app are:
 4. I need to find a place near me right now. Let me look around where I am and filter my curated list of good places to find something that fits what I'm looking for
 5. I'm planning an upcoming date night, so I don't have many constraints. Let me look at my list of new places that I've heard about (and maybe tagged date-night)
 6. I need a cool place to go to dinner next Tuesday — what places have available reservations or are walk-in only?
+7. I'm looking for a place for dinner on March 15th. Show me all of the restaurants
+  that have not opened their reservations yet or are walk-in only (i.e., where I could
+  still snag a reservation when it opens
+8. I'm looking for a place for dinner tomorrow night for 2. Show me all of the place
+  sthat match my filters that have available reservations (this requires searching for
+  reservations now) or are walk-in only
 
 The app should be optimized for these use cases.

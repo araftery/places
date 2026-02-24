@@ -5,6 +5,16 @@ import type { TravelTimeBand } from "@/app/page";
 
 const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
 
+const PROVIDER_SHORT: Record<string, string> = {
+  resy: "Resy",
+  opentable: "OT",
+  sevenrooms: "7R",
+  thefork: "TF",
+  walk_in: "Walk-in",
+  phone: "Phone",
+  other: "Res",
+};
+
 interface PlaceCardProps {
   place: Place;
   isSelected: boolean;
@@ -88,6 +98,12 @@ export default function PlaceCard({
               <span className="font-semibold uppercase text-[var(--color-terracotta)]">Closed</span>
             </>
           )}
+          {!place.closedPermanently && place.reservationProvider && PROVIDER_SHORT[place.reservationProvider] && (
+            <>
+              <span className="text-[var(--color-sidebar-muted)]/40">&middot;</span>
+              <span className="text-[var(--color-sidebar-muted)]/70">{PROVIDER_SHORT[place.reservationProvider]}</span>
+            </>
+          )}
         </div>
       </button>
     );
@@ -157,6 +173,11 @@ export default function PlaceCard({
         {googleRating?.rating && (
           <span className="text-[11px] text-[var(--color-amber)]">
             ★ {googleRating.rating}
+          </span>
+        )}
+        {place.reservationProvider && PROVIDER_SHORT[place.reservationProvider] && (
+          <span className="text-[11px] text-[var(--color-sidebar-muted)]/70">
+            {PROVIDER_SHORT[place.reservationProvider]}
           </span>
         )}
         {place.cuisineType && place.cuisineType.length > 0 && (

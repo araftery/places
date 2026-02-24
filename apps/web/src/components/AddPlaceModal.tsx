@@ -7,6 +7,7 @@ import {
   City,
   PLACE_TYPES,
   GOOGLE_TYPE_MAP,
+  RESERVATION_PROVIDERS,
 } from "@/lib/types";
 
 interface GoogleSuggestion {
@@ -80,6 +81,7 @@ export default function AddPlaceModal({
   const [newTagName, setNewTagName] = useState("");
   const [saving, setSaving] = useState(false);
   const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [reservationProvider, setReservationProvider] = useState("");
 
   // Inline city creation
   const [showNewCity, setShowNewCity] = useState(false);
@@ -267,6 +269,7 @@ export default function AddPlaceModal({
           tagIds: selectedTagIds,
           googleRating: details.googleRating,
           googleRatingCount: details.googleRatingCount,
+          reservationProvider: reservationProvider || null,
         }),
       });
       resetForm();
@@ -296,6 +299,7 @@ export default function AddPlaceModal({
     setNewCityCountry("US");
     setCityWarning(null);
     setShowMoreDetails(false);
+    setReservationProvider("");
   }
 
   if (!open) return null;
@@ -680,6 +684,22 @@ export default function AddPlaceModal({
                       className={inputClass}
                       placeholder="How you heard about it"
                     />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Reservation Provider</label>
+                    <select
+                      value={reservationProvider}
+                      onChange={(e) => setReservationProvider(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">None</option>
+                      {RESERVATION_PROVIDERS.map((rp) => (
+                        <option key={rp.value} value={rp.value}>
+                          {rp.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </>
               )}

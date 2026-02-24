@@ -1,6 +1,6 @@
 "use client";
 
-import { Place, Tag, PlaceRating, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, PlaceRating, PLACE_TYPES, RESERVATION_PROVIDERS } from "@/lib/types";
 import { generateReviewLinks } from "@/lib/review-links";
 import { formatRating, formatCount, getBestBlurb } from "@/lib/format-ratings";
 import { useState } from "react";
@@ -196,6 +196,16 @@ export default function PlaceDetail({
   const [saving, setSaving] = useState(false);
   const [hoursExpanded, setHoursExpanded] = useState(false);
 
+  // Reservation fields
+  const [resProvider, setResProvider] = useState(place.reservationProvider || "");
+  const [resUrl, setResUrl] = useState(place.reservationUrl || "");
+  const [resWindowDays, setResWindowDays] = useState(place.openingWindowDays?.toString() || "");
+  const [resOpeningTime, setResOpeningTime] = useState(place.openingTime || "");
+  const [resPattern, setResPattern] = useState(place.openingPattern || "");
+  const [resBulkDesc, setResBulkDesc] = useState(place.openingBulkDescription || "");
+  const [resLastDate, setResLastDate] = useState(place.lastAvailableDate || "");
+  const [resNotes, setResNotes] = useState(place.reservationNotes || "");
+
   // Manual rating entry
   const [addingRating, setAddingRating] = useState(false);
   const [ratingSource, setRatingSource] = useState("");
@@ -278,6 +288,14 @@ export default function PlaceDetail({
           personalNotes: notes || null,
           source: source || null,
           tagIds: selectedTagIds,
+          reservationProvider: resProvider || null,
+          reservationUrl: resUrl || null,
+          openingWindowDays: resWindowDays ? parseInt(resWindowDays) : null,
+          openingTime: resOpeningTime || null,
+          openingPattern: resPattern || null,
+          openingBulkDescription: resBulkDesc || null,
+          lastAvailableDate: resLastDate || null,
+          reservationNotes: resNotes || null,
         }),
       });
       const updated = await res.json();
@@ -507,6 +525,147 @@ export default function PlaceDetail({
                 placeholder="How you heard about it..."
               />
             </div>
+
+            {/* Reservation fields */}
+            <div className="border-t border-[#e0d6ca] pt-4">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                Reservations
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                    Provider
+                  </label>
+                  <select
+                    value={resProvider}
+                    onChange={(e) => setResProvider(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-amber)] focus:outline-none"
+                  >
+                    <option value="">None</option>
+                    {RESERVATION_PROVIDERS.map((rp) => (
+                      <option key={rp.value} value={rp.value}>
+                        {rp.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {resProvider && !["walk_in", "phone", "none"].includes(resProvider) && (
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                      Booking URL
+                    </label>
+                    <input
+                      value={resUrl}
+                      onChange={(e) => setResUrl(e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                      placeholder="https://resy.com/..."
+                    />
+                  </div>
+                )}
+                {resProvider && resProvider !== "none" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                          Window (days)
+                        </label>
+                        <input
+                          type="number"
+                          value={resWindowDays}
+                          onChange={(e) => setResWindowDays(e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                          placeholder="e.g. 28"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                          Opening Time
+                        </label>
+                        <input
+                          value={resOpeningTime}
+                          onChange={(e) => setResOpeningTime(e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                          placeholder="e.g. 10:00"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                        Opening Pattern
+                      </label>
+                      <div className="mt-1.5 flex gap-3">
+                        <label className="flex items-center gap-1.5 text-sm text-[var(--color-ink)]">
+                          <input
+                            type="radio"
+                            name="openingPattern"
+                            value="rolling"
+                            checked={resPattern === "rolling"}
+                            onChange={(e) => setResPattern(e.target.value)}
+                            className="accent-[var(--color-amber)]"
+                          />
+                          Rolling
+                        </label>
+                        <label className="flex items-center gap-1.5 text-sm text-[var(--color-ink)]">
+                          <input
+                            type="radio"
+                            name="openingPattern"
+                            value="bulk"
+                            checked={resPattern === "bulk"}
+                            onChange={(e) => setResPattern(e.target.value)}
+                            className="accent-[var(--color-amber)]"
+                          />
+                          Bulk
+                        </label>
+                        {resPattern && (
+                          <button
+                            type="button"
+                            onClick={() => setResPattern("")}
+                            className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {resPattern === "bulk" && (
+                      <div>
+                        <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                          Bulk Description
+                        </label>
+                        <input
+                          value={resBulkDesc}
+                          onChange={(e) => setResBulkDesc(e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                          placeholder="e.g. 1st of month opens entire next month"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                        Last Available Date
+                      </label>
+                      <input
+                        type="date"
+                        value={resLastDate}
+                        onChange={(e) => setResLastDate(e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-amber)] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                        Reservation Notes
+                      </label>
+                      <input
+                        value={resNotes}
+                        onChange={(e) => setResNotes(e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                        placeholder="e.g. Counter seating walk-in only"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           /* ── Read-Only Mode ── */
@@ -613,6 +772,83 @@ export default function PlaceDetail({
                 )}
               </div>
             </div>
+
+            {/* Reservations */}
+            {place.reservationProvider && place.reservationProvider !== "" && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                  Reservations
+                </p>
+                <div className="mt-1.5 rounded-lg bg-[var(--color-cream)] px-3.5 py-2.5 space-y-1">
+                  <p className="text-sm font-medium text-[var(--color-ink)]">
+                    {RESERVATION_PROVIDERS.find((rp) => rp.value === place.reservationProvider)?.label || place.reservationProvider}
+                  </p>
+                  {place.openingWindowDays && place.openingPattern && (
+                    <p className="text-xs text-[var(--color-ink-light)]">
+                      {place.openingWindowDays}-day {place.openingPattern} window
+                    </p>
+                  )}
+                  {place.openingWindowDays && !place.openingPattern && (
+                    <p className="text-xs text-[var(--color-ink-light)]">
+                      {place.openingWindowDays}-day booking window
+                    </p>
+                  )}
+                  {place.openingPattern === "bulk" && place.openingBulkDescription && (
+                    <p className="text-xs text-[var(--color-ink-light)]">
+                      {place.openingBulkDescription}
+                    </p>
+                  )}
+                  {place.openingTime && (
+                    <p className="text-xs text-[var(--color-ink-light)]">
+                      Opens daily at {place.openingTime}
+                    </p>
+                  )}
+                  {place.lastAvailableDate && (
+                    <p className="text-xs text-[var(--color-ink-light)]">
+                      Bookable through{" "}
+                      {new Date(place.lastAvailableDate + "T12:00:00").toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  )}
+                  {place.openingPattern === "rolling" && place.lastAvailableDate && place.openingTime && (
+                    <p className="text-xs font-medium text-[var(--color-amber)]">
+                      Next opening:{" "}
+                      {(() => {
+                        const next = new Date(place.lastAvailableDate + "T12:00:00");
+                        next.setDate(next.getDate() + 1);
+                        return next.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        });
+                      })()}{" "}
+                      at {place.openingTime}
+                    </p>
+                  )}
+                  {place.reservationNotes && (
+                    <p className="text-xs italic text-[var(--color-ink-light)]">
+                      {place.reservationNotes}
+                    </p>
+                  )}
+                  {place.reservationUrl && (
+                    <a
+                      href={place.reservationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-[#e0d6ca] bg-[var(--color-parchment)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-amber)] transition-colors hover:border-[var(--color-amber)]"
+                    >
+                      Book on{" "}
+                      {RESERVATION_PROVIDERS.find((rp) => rp.value === place.reservationProvider)?.label || "Provider"}
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 17L17 7" />
+                        <path d="M7 7h10v10" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Tags (no section label) */}
             {place.tags.length > 0 && (
@@ -785,6 +1021,14 @@ export default function PlaceDetail({
                   setSource(place.source || "");
                   setSelectedTagIds(place.tags.map((t) => t.id));
                   setNewTagName("");
+                  setResProvider(place.reservationProvider || "");
+                  setResUrl(place.reservationUrl || "");
+                  setResWindowDays(place.openingWindowDays?.toString() || "");
+                  setResOpeningTime(place.openingTime || "");
+                  setResPattern(place.openingPattern || "");
+                  setResBulkDesc(place.openingBulkDescription || "");
+                  setResLastDate(place.lastAvailableDate || "");
+                  setResNotes(place.reservationNotes || "");
                   setEditing(true);
                 }}
                 className="flex-1 rounded-md bg-[var(--color-cream)] px-3 py-2 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-parchment-dark)]"

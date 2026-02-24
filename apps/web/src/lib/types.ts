@@ -49,6 +49,16 @@ export interface Place {
   googlePlaceId: string | null;
   hoursJson: unknown;
   closedPermanently: boolean;
+  reservationProvider: string | null;
+  reservationExternalId: string | null;
+  reservationUrl: string | null;
+  openingWindowDays: number | null;
+  openingTime: string | null;
+  openingPattern: string | null;
+  openingBulkDescription: string | null;
+  lastAvailableDate: string | null;
+  lastReservationCheck: string | null;
+  reservationNotes: string | null;
   createdAt: string;
   updatedAt: string;
   tags: Tag[];
@@ -78,6 +88,17 @@ export interface PlaceFormData {
   googleRating: number | null;
   googleRatingCount: number | null;
 }
+
+export const RESERVATION_PROVIDERS = [
+  { value: "resy", label: "Resy" },
+  { value: "opentable", label: "OpenTable" },
+  { value: "sevenrooms", label: "SevenRooms" },
+  { value: "thefork", label: "TheFork" },
+  { value: "walk_in", label: "Walk-in Only" },
+  { value: "phone", label: "Phone / WhatsApp" },
+  { value: "other", label: "Other" },
+  { value: "none", label: "No Reservations" },
+] as const;
 
 export const PLACE_TYPES = [
   { value: "restaurant", label: "Restaurant" },
