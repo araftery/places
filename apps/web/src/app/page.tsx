@@ -89,6 +89,7 @@ export default function Home() {
   // Preview pin from AddPlaceModal
   const [previewPin, setPreviewPin] = useState<{ lat: number; lng: number; name: string } | null>(null);
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 40.735, lng: -73.99 });
 
   // Isochrone state
   const [isoSettings, setIsoSettings] = useState<IsochroneSettings>({
@@ -357,6 +358,7 @@ export default function Home() {
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
           onMapClick={handleMapClick}
+          onMoveEnd={setMapCenter}
           isochroneGeoJson={isoGeoJson}
           isochroneOrigin={
             isoSettings.lat && isoSettings.lng
@@ -379,6 +381,7 @@ export default function Home() {
             onClear={clearIsochrone}
             onUseLocation={useMyLocation}
             hasIsochrone={!!isoGeoJson}
+            mapCenter={mapCenter}
           />
         </div>
 

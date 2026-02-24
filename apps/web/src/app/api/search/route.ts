@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   const input = searchParams.get("input");
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
+  const allTypes = searchParams.get("allTypes") === "1";
 
   if (!input) {
     return NextResponse.json({ error: "input is required" }, { status: 400 });
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   const locationBias =
     lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng) } : undefined;
 
-  const suggestions = await autocomplete(input, locationBias);
+  const suggestions = await autocomplete(input, locationBias, { allTypes });
   return NextResponse.json(suggestions);
 }
 

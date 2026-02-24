@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 export interface IsochroneSettings {
   active: boolean;
@@ -20,6 +20,17 @@ function getRingColors(steps: number[]): { minutes: number; color: string }[] {
   return steps.map((m, i) => ({ minutes: m, color: palette[i] }));
 }
 
+interface Suggestion {
+  placePrediction: {
+    placeId: string;
+    text: { text: string };
+    structuredFormat: {
+      mainText: { text: string };
+      secondaryText: { text: string };
+    };
+  };
+}
+
 interface IsochroneControlProps {
   settings: IsochroneSettings;
   onChange: (settings: IsochroneSettings) => void;
@@ -28,6 +39,7 @@ interface IsochroneControlProps {
   onClear: () => void;
   onUseLocation: () => void;
   hasIsochrone: boolean;
+  mapCenter?: { lat: number; lng: number };
 }
 
 const MODES = [
@@ -44,8 +56,70 @@ export default function IsochroneControl({
   onClear,
   onUseLocation,
   hasIsochrone,
+  mapCenter,
 }: IsochroneControlProps) {
   const [expanded, setExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const fetchSuggestions = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      let url = `/api/search?input=${encodeURIComponent(query)}&allTypes=1`;
+      if (mapCenter) {
+        url += `&lat=${mapCenter.lat}&lng=${mapCenter.lng}`;
+      }
+      const res = await fetch(url);
+      const data = await res.json();
+      setSuggestions(data);
+    } catch {
+      setSuggestions([]);
+    }
+  }, [mapCenter]);
+
+  function handleSearchInput(value: string) {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(value), 300);
+  }
+
+  async function selectSuggestion(suggestion: Suggestion) {
+    setSearchLoading(true);
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ placeId: suggestion.placePrediction.placeId }),
+      });
+      const data = await res.json();
+      if (data.lat && data.lng) {
+        onChange({ ...settings, lat: data.lat, lng: data.lng });
+      }
+    } finally {
+      setSearchLoading(false);
+      setShowSearch(false);
+      setSearchQuery("");
+      setSuggestions([]);
+    }
+  }
+
+  // Close search dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSuggestions([]);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const steps = TIME_STEPS[settings.mode];
   const rings = getRingColors(steps);
@@ -96,6 +170,9 @@ export default function IsochroneControl({
         <button
           onClick={() => {
             setExpanded(false);
+            setShowSearch(false);
+            setSearchQuery("");
+            setSuggestions([]);
             onClear();
             onChange({
               active: false,
@@ -117,12 +194,57 @@ export default function IsochroneControl({
       </p>
 
       {!settings.lat && (
-        <button
-          onClick={onUseLocation}
-          className="mt-2.5 w-full rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
-        >
-          Use my location
-        </button>
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          <button
+            onClick={onUseLocation}
+            className="w-full rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
+          >
+            Use my location
+          </button>
+
+          {!showSearch ? (
+            <button
+              onClick={() => setShowSearch(true)}
+              className="w-full rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
+            >
+              Search for a place
+            </button>
+          ) : (
+            <div ref={searchRef} className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                placeholder="e.g. AMC Lincoln Square"
+                autoFocus
+                className="w-full rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-2.5 py-1.5 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]/50 focus:border-[var(--color-amber)] focus:outline-none"
+              />
+              {searchLoading && (
+                <div className="mt-1.5 text-center text-[10px] text-[var(--color-ink-muted)]">
+                  Setting location...
+                </div>
+              )}
+              {suggestions.length > 0 && !searchLoading && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-[#e0d6ca] bg-[var(--color-parchment)]" style={{ boxShadow: "var(--shadow-float)" }}>
+                  {suggestions.map((s) => (
+                    <button
+                      key={s.placePrediction.placeId}
+                      onClick={() => selectSuggestion(s)}
+                      className="w-full px-2.5 py-2 text-left transition-colors hover:bg-[var(--color-cream)]"
+                    >
+                      <div className="text-xs font-medium text-[var(--color-ink)]">
+                        {s.placePrediction.structuredFormat.mainText.text}
+                      </div>
+                      <div className="text-[10px] text-[var(--color-ink-muted)]">
+                        {s.placePrediction.structuredFormat.secondaryText.text}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {settings.lat && (

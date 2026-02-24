@@ -70,18 +70,22 @@ export function createGoogleClient(config: GoogleClientConfig) {
 
   async function autocomplete(
     input: string,
-    locationBias?: { lat: number; lng: number }
+    locationBias?: { lat: number; lng: number },
+    options?: { allTypes?: boolean }
   ): Promise<AutocompleteResult[]> {
     const body: Record<string, unknown> = {
       input,
-      includedPrimaryTypes: [
+    };
+
+    if (!options?.allTypes) {
+      body.includedPrimaryTypes = [
         "restaurant",
         "bar",
         "cafe",
         "tourist_attraction",
         "store",
-      ],
-    };
+      ];
+    }
 
     if (locationBias) {
       body.locationBias = {

@@ -30,6 +30,7 @@ interface MapProps {
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
   onMapClick?: (lat: number, lng: number) => void;
+  onMoveEnd?: (center: { lat: number; lng: number }) => void;
   isochroneGeoJson?: GeoJSON.FeatureCollection | null;
   isochroneOrigin?: { lat: number; lng: number } | null;
   travelTimes?: Map<number, TravelTimeBand>;
@@ -49,6 +50,7 @@ export default function Map({
   flyTo,
   previewPin,
   showDetail,
+  onMoveEnd,
 }: MapProps) {
   const mapRef = useRef<MapRef>(null);
 
@@ -96,6 +98,12 @@ export default function Map({
       mapStyle="mapbox://styles/mapbox/light-v11"
       mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
       onClick={handleClick}
+      onMoveEnd={(e) => {
+        if (onMoveEnd) {
+          const center = e.target.getCenter();
+          onMoveEnd({ lat: center.lat, lng: center.lng });
+        }
+      }}
     >
       <NavigationControl position="top-right" />
       <GeolocateControl position="top-right" />
