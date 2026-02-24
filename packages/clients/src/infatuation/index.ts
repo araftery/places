@@ -26,6 +26,45 @@ export interface InfatuationClientConfig {
   proxyUrl?: string;
 }
 
+export interface GuideListItem {
+  slug: string;
+  title: string;
+  canonicalPath: string;
+  previewText: string | null;
+  publishedAt: string | null;
+}
+
+export interface GuideVenue {
+  name: string;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  price: number | null;
+  closedStatus: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
+export interface GuideRestaurant {
+  headline: string | null;
+  title: string;
+  rating: number | null;
+  preview: string | null;
+  blurb: string | null;
+  neighborhood: string | null;
+  publishDate: string | null;
+  addedDate: string | null;
+  reviewSlug: string;
+  canonicalPath: string | null;
+  venue: GuideVenue;
+}
+
+export interface GuideContent {
+  slug: string;
+  title: string;
+  restaurants: GuideRestaurant[];
+}
+
 export function createInfatuationClient(config?: InfatuationClientConfig) {
   const token = config?.contentfulToken ?? CONTENTFUL_TOKEN;
   const fetchFn = createFetch(config?.proxyUrl);
@@ -251,6 +290,210 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
     }));
   }
 
+  async function listGuides(canonicalPath: string): Promise<GuideListItem[]> {
+    const graphqlQuery = `
+      query getGuides($canonicalPath: String!, $enableSitewideSearch: Boolean!) {
+        searchPosts(input: {
+          canonicalPathText: $canonicalPath
+          postCategoryTypeText: [POST_GUIDE]
+          enableSitewideSearch: $enableSitewideSearch
+          searchText: ""
+        }) {
+          nodes {
+            documentTitleText
+            slugName
+            canonicalPathText
+            publishedTimestamp
+            previewText
+          }
+        }
+      }
+    `;
+
+    const res = await fetchFn(PSS_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables: {
+          canonicalPath,
+          enableSitewideSearch: true,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Infatuation PSS listGuides error: ${text}`);
+    }
+
+    const data = await res.json();
+    const nodes = data?.data?.searchPosts?.nodes ?? [];
+
+    return nodes.map((n: Record<string, unknown>) => ({
+      slug: n.slugName as string,
+      title: n.documentTitleText as string,
+      canonicalPath: n.canonicalPathText as string,
+      previewText: (n.previewText as string) || null,
+      publishedAt: (n.publishedTimestamp as string) || null,
+    }));
+  }
+
+  async function getGuideContent(slug: string): Promise<GuideContent> {
+    const graphqlQuery = `
+      query {
+        postGuideCollection(limit: 1, where: { slug: { name: "${slug}" } }) {
+          items {
+            title
+            slug { name }
+            contentV2BodyCollection(limit: 100) {
+              items {
+                __typename
+                ... on Caption {
+                  sys { firstPublishedAt }
+                  headline
+                  content { json }
+                  review {
+                    title
+                    rating
+                    preview
+                    publishDate
+                    slug { name }
+                    canonicalPath
+                    neighborhoodTagsCollection(limit: 1) { items { displayName } }
+                    venue {
+                      name
+                      street
+                      city
+                      state
+                      price
+                      closedStatus
+                      latlong { lat lon }
+                    }
+                  }
+                }
+                ... on CaptionGroup {
+                  spotsCollection(limit: 50) {
+                    items {
+                      sys { firstPublishedAt }
+                      headline
+                      content { json }
+                      review {
+                        title
+                        rating
+                        preview
+                        publishDate
+                        slug { name }
+                        canonicalPath
+                        neighborhoodTagsCollection(limit: 1) { items { displayName } }
+                        venue {
+                          name
+                          street
+                          city
+                          state
+                          price
+                          closedStatus
+                          latlong { lat lon }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const res = await fetchFn(CONTENTFUL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query: graphqlQuery }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Infatuation Contentful getGuideContent error: ${text}`);
+    }
+
+    const data = await res.json();
+    const item = data?.data?.postGuideCollection?.items?.[0];
+
+    if (!item) {
+      throw new Error(`No guide found for slug: ${slug}`);
+    }
+
+    const restaurants: GuideRestaurant[] = [];
+    const contentItems = item.contentV2BodyCollection?.items ?? [];
+
+    // Extract plain text from Contentful rich text JSON
+    function richTextToPlain(node: unknown): string {
+      if (!node || typeof node !== "object") return "";
+      const n = node as Record<string, unknown>;
+      if (n.nodeType === "text") return (n.value as string) || "";
+      const children = n.content as unknown[] | undefined;
+      if (!children) return "";
+      return children.map(richTextToPlain).join("");
+    }
+
+    function extractFromCaption(caption: Record<string, unknown>) {
+      const review = caption.review as Record<string, unknown> | null;
+      if (!review) return;
+      const venue = review.venue as Record<string, unknown> | null;
+      const latlong = venue?.latlong as Record<string, number> | null;
+      const reviewSlug = review.slug as Record<string, string> | null;
+      const sys = caption.sys as Record<string, string> | null;
+      const contentField = caption.content as Record<string, unknown> | null;
+      const blurb = contentField?.json ? richTextToPlain(contentField.json).trim() : null;
+      const neighborhoodTags = (review.neighborhoodTagsCollection as Record<string, unknown>)?.items as Array<Record<string, string>> | undefined;
+      const neighborhood = neighborhoodTags?.[0]?.displayName || null;
+
+      restaurants.push({
+        headline: (caption.headline as string) || null,
+        title: (review.title as string) || "",
+        rating: (review.rating as number) ?? null,
+        preview: (review.preview as string) || null,
+        blurb: blurb || null,
+        neighborhood,
+        publishDate: (review.publishDate as string) || null,
+        addedDate: sys?.firstPublishedAt || null,
+        reviewSlug: reviewSlug?.name || "",
+        canonicalPath: (review.canonicalPath as string) || null,
+        venue: {
+          name: (venue?.name as string) || "",
+          street: (venue?.street as string) || null,
+          city: (venue?.city as string) || null,
+          state: (venue?.state as string) || null,
+          price: (venue?.price as number) ?? null,
+          closedStatus: (venue?.closedStatus as string) || null,
+          lat: latlong?.lat ?? null,
+          lng: latlong?.lon ?? null,
+        },
+      });
+    }
+
+    for (const ci of contentItems) {
+      if (ci.__typename === "Caption") {
+        extractFromCaption(ci);
+      } else if (ci.__typename === "CaptionGroup") {
+        const spots = ci.spotsCollection?.items ?? [];
+        for (const spot of spots) {
+          extractFromCaption(spot);
+        }
+      }
+    }
+
+    return {
+      slug: item.slug?.name || slug,
+      title: item.title || "",
+      restaurants,
+    };
+  }
+
   return {
     /** Search via PSS (Post Search Service) — returns standardized SearchResult[] */
     search: searchPSS,
@@ -258,6 +501,10 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
     lookup: lookupBySlug,
     /** List all cities available on The Infatuation */
     listCities,
+    /** List guides for a city via PSS */
+    listGuides,
+    /** Get guide content (restaurants) via Contentful */
+    getGuideContent,
   };
 }
 

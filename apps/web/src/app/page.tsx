@@ -16,64 +16,10 @@ import IsochroneControl, {
 } from "@/components/IsochroneControl";
 import MobileBottomSheet from "@/components/MobileBottomSheet";
 import { Place, Tag, City } from "@/lib/types";
+import { isInIsochrone, getTravelTimeBand, type TravelTimeBand } from "@/lib/geo";
+export type { TravelTimeBand } from "@/lib/geo";
 
 const MapView = dynamic(() => import("@/components/Map"), { ssr: false });
-
-function isPointInPolygon(
-  lat: number,
-  lng: number,
-  polygon: number[][]
-): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i][1],
-      yi = polygon[i][0];
-    const xj = polygon[j][1],
-      yj = polygon[j][0];
-    const intersect =
-      yi > lng !== yj > lng && lat < ((xj - xi) * (lng - yi)) / (yj - yi) + xi;
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
-function isPlaceInIsochrone(
-  place: Place,
-  geoJson: GeoJSON.FeatureCollection
-): boolean {
-  for (const feature of geoJson.features) {
-    if (feature.geometry.type === "Polygon") {
-      const coords = feature.geometry.coordinates[0] as number[][];
-      if (isPointInPolygon(place.lat, place.lng, coords)) return true;
-    }
-  }
-  return false;
-}
-
-export interface TravelTimeBand {
-  minutes: number;
-  color: string;
-}
-
-function getTravelTimeBand(
-  place: Place,
-  geoJson: GeoJSON.FeatureCollection
-): TravelTimeBand | null {
-  let best: TravelTimeBand | null = null;
-  for (const feature of geoJson.features) {
-    const props = feature.properties as { minutes: number; color: string } | null;
-    if (!props) continue;
-    if (feature.geometry.type === "Polygon") {
-      const coords = feature.geometry.coordinates[0] as number[][];
-      if (isPointInPolygon(place.lat, place.lng, coords)) {
-        if (!best || props.minutes < best.minutes) {
-          best = { minutes: props.minutes, color: props.color };
-        }
-      }
-    }
-  }
-  return best;
-}
 
 export default function Home() {
   const [places, setPlaces] = useState<Place[]>([]);
@@ -89,6 +35,9 @@ export default function Home() {
 
   // Preview pin from AddPlaceModal
   const [previewPin, setPreviewPin] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  // Discover pins from Infatuation guides
+  const [discoverPins, setDiscoverPins] = useState<{ lat: number; lng: number; name: string; rating: number | null; alreadyInList: boolean }[]>([]);
+  const [selectedDiscoverIndex, setSelectedDiscoverIndex] = useState<number | null>(null);
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 40.735, lng: -73.99 });
 
@@ -186,7 +135,7 @@ export default function Home() {
     }
     result = applyFilters(result, filters);
     if (isoGeoJson) {
-      result = result.filter((p) => isPlaceInIsochrone(p, isoGeoJson));
+      result = result.filter((p) => isInIsochrone(p.lat, p.lng, isoGeoJson));
     }
     return result;
   }, [places, selectedCityId, filters, isoGeoJson]);
@@ -195,7 +144,7 @@ export default function Home() {
     const map = new Map<number, TravelTimeBand>();
     if (!isoGeoJson) return map;
     for (const place of filteredPlaces) {
-      const band = getTravelTimeBand(place, isoGeoJson);
+      const band = getTravelTimeBand(place.lat, place.lng, isoGeoJson);
       if (band) map.set(place.id, band);
     }
     return map;
@@ -312,6 +261,18 @@ export default function Home() {
     setReviewClosed((prev) => prev.filter((p) => p.id !== id));
   }
 
+  function handleSelectDiscoverIndex(index: number | null) {
+    setSelectedDiscoverIndex(index);
+    if (index != null && discoverPins[index]) {
+      setFlyTo({ lat: discoverPins[index].lat, lng: discoverPins[index].lng });
+    }
+  }
+
+  function handleDiscoverPinsChange(pins: { lat: number; lng: number; name: string; rating: number | null; alreadyInList: boolean }[]) {
+    setDiscoverPins(pins);
+    setSelectedDiscoverIndex(null);
+  }
+
   function handlePlacePreview(location: { lat: number; lng: number; name: string } | null) {
     setPreviewPin(location);
     if (location) {
@@ -322,6 +283,10 @@ export default function Home() {
   }
 
   function handleMapClick(lat: number, lng: number) {
+    // Deselect discover pin on map click
+    if (selectedDiscoverIndex != null) {
+      setSelectedDiscoverIndex(null);
+    }
     if (isoSettings.active) {
       setIsoSettings((prev) => ({ ...prev, lat, lng }));
       setIsoGeoJson(null);
@@ -405,6 +370,12 @@ export default function Home() {
           selectedCityId={selectedCityId}
           onCityChange={handleCityChange}
           isochroneActive={!!isoGeoJson}
+          isoGeoJson={isoGeoJson}
+          allPlaces={places}
+          onPlaceAdded={fetchPlaces}
+          onDiscoverPinsChange={handleDiscoverPinsChange}
+          selectedDiscoverIndex={selectedDiscoverIndex}
+          onSelectDiscoverIndex={handleSelectDiscoverIndex}
         />
       </div>
 
@@ -426,6 +397,9 @@ export default function Home() {
           flyTo={flyTo}
           previewPin={previewPin}
           showDetail={showDetail}
+          discoverPins={discoverPins}
+          selectedDiscoverIndex={selectedDiscoverIndex}
+          onSelectDiscoverPin={handleSelectDiscoverIndex}
         />
 
         {/* Isochrone controls */}
@@ -499,6 +473,12 @@ export default function Home() {
           selectedCityId={selectedCityId}
           onCityChange={handleCityChange}
           isochroneActive={!!isoGeoJson}
+          isoGeoJson={isoGeoJson}
+          allPlaces={places}
+          onPlaceAdded={fetchPlaces}
+          onDiscoverPinsChange={handleDiscoverPinsChange}
+          selectedDiscoverIndex={selectedDiscoverIndex}
+          onSelectDiscoverIndex={handleSelectDiscoverIndex}
         />
       )}
 

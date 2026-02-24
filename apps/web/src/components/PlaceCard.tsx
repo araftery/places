@@ -1,7 +1,7 @@
 "use client";
 
 import { Place } from "@/lib/types";
-import type { TravelTimeBand } from "@/app/page";
+import type { TravelTimeBand } from "@/lib/geo";
 
 const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
 

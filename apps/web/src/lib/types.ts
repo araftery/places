@@ -11,6 +11,7 @@ export interface City {
   lat: number;
   lng: number;
   providers: string[];
+  infatuationSlug: string | null;
 }
 
 export interface PlaceRating {

@@ -94,6 +94,40 @@ For other packages:
 - **City auto-detection**: After Google lookup returns lat/lng, `AddPlaceModal` calls `GET /api/cities/closest` to auto-select the nearest city. Includes inline city creation.
 - **Review clients**: All clients in `packages/clients/src/` follow the factory pattern (`createXClient(config)`) and return a common `SearchResult`/`LookupResult` interface. All accept optional `proxyUrl`.
 - **Provider modules**: `jobs/src/providers/` encapsulate scraping logic per source. Both `initiate-coverage` and audit tasks use the same modules.
+- **Shared geo helpers**: `apps/web/src/lib/geo.ts` exports `isPointInPolygon`, `isInIsochrone`, `getTravelTimeBand`, and `TravelTimeBand` type. Used by both `page.tsx` and `DiscoverPanel` for isochrone filtering and travel time display.
+
+## Discover Tab (Infatuation Guide Browser)
+
+Browse Infatuation restaurant guides (Hitlist, New Openings, Top 25, etc.) per city and one-click add restaurants to your places list. Only available when the selected city has an `infatuationSlug` (stored on `cities` table).
+
+### Infatuation Client Methods
+
+In `packages/clients/src/infatuation/index.ts`:
+- `listGuides(canonicalPath)` — queries Infatuation PSS GraphQL for all guides in a city
+- `getGuideContent(slug)` — queries Infatuation Contentful GraphQL for a guide's restaurants (handles both `Caption` and `CaptionGroup` content types)
+- Types: `GuideListItem`, `GuideRestaurant`, `GuideVenue`, `GuideContent`
+
+### API Routes
+
+- `GET /api/discover/guides?citySlug=/new-york` — lists guides for a city
+- `GET /api/discover/guides/[slug]` — fetches guide content (restaurants)
+- `POST /api/discover/add` — auto-matches Infatuation venue to Google Places, saves via same logic as `POST /api/places`. Request: `{ name, lat, lng, cityId, source }`. Returns `{ matched, duplicate?, place? }`
+
+Shared helper `mapGoogleDetailsToPlace()` in `apps/web/src/lib/google-places.ts` extracts address parsing + cuisine derivation logic used by both `/api/search` and `/api/discover/add`.
+
+### Components
+
+- **`DiscoverPanel`** (`apps/web/src/components/DiscoverPanel.tsx`) — main browser with guide list → guide detail views. Auto-selects "New Openings" (if available) or "Hit List" on load. New Openings sorted newest-first, limited to 75 restaurants. Pushes `DiscoverPin[]` to the map via `onDiscoverPinsChange`.
+- **`DiscoverRestaurantCard`** (`apps/web/src/components/DiscoverRestaurantCard.tsx`) — restaurant card with add button states: idle → adding → added/duplicate/no-match.
+
+### Key Behaviors
+
+- **Map pins**: When Discover tab is active, My Places pins are hidden. Discover pins use cream background (`#faf6f1`) with solid borders — amber for new restaurants, slate-blue for already-in-list.
+- **"Already in list" detection**: Matches by Infatuation review slug in `place_ratings.externalId` (source: `"infatuation"`), with name fallback. Uses slate-blue accent color in both map pins and sidebar cards.
+- **Isochrone integration**: Discover restaurants filter to those within the isochrone polygon. Travel time bands display on cards. Sort-by-nearest auto-activates when isochrone is active.
+- **Auto-open PlaceDetail**: Clicking an in-list card opens the matching place's detail panel. Newly added places auto-open after the places list refreshes (via `pendingOpenPlaceId` state + effect).
+- **Tab system**: Both `Sidebar` and `MobileBottomSheet` render "My Places" / "Discover" tabs. Switching to "My Places" clears discover pins. A `tabMountedRef` prevents clearing pins when the component re-mounts (e.g., closing PlaceDetail).
+- **Pin ↔ card selection**: Index mapping between sorted restaurant list and pin list computed via `useMemo` from `sortedRestaurants`. Clicking a map pin scrolls to and highlights the sidebar card, and vice versa.
 
 ## Environment Variables
 

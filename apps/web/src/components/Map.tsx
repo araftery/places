@@ -12,7 +12,7 @@ import MapGL, {
 } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Place } from "@/lib/types";
-import type { TravelTimeBand } from "@/app/page";
+import type { TravelTimeBand } from "@/lib/geo";
 
 const TYPE_ICONS: Record<string, string> = {
   restaurant: "\u{1F374}",
@@ -24,6 +24,14 @@ const TYPE_ICONS: Record<string, string> = {
   bakery: "\u{1F950}",
   other: "\u{1F4CD}",
 };
+
+export interface DiscoverPin {
+  lat: number;
+  lng: number;
+  name: string;
+  rating: number | null;
+  alreadyInList: boolean;
+}
 
 interface MapProps {
   places: Place[];
@@ -37,6 +45,9 @@ interface MapProps {
   flyTo?: { lat: number; lng: number; zoom?: number } | null;
   previewPin?: { lat: number; lng: number; name: string } | null;
   showDetail?: boolean;
+  discoverPins?: DiscoverPin[];
+  selectedDiscoverIndex?: number | null;
+  onSelectDiscoverPin?: (index: number | null) => void;
 }
 
 export default function Map({
@@ -51,6 +62,9 @@ export default function Map({
   previewPin,
   showDetail,
   onMoveEnd,
+  discoverPins,
+  selectedDiscoverIndex,
+  onSelectDiscoverPin,
 }: MapProps) {
   const mapRef = useRef<MapRef>(null);
 
@@ -150,7 +164,8 @@ export default function Map({
         </Marker>
       )}
 
-      {places.map((place) => {
+      {/* My Places pins — hidden when discover mode is active */}
+      {!discoverPins?.length && places.map((place) => {
         const color = place.beenThere ? "#5a7a5e" : "#5b7b9a";
         const icon = TYPE_ICONS[place.placeType || "other"] || "\u{1F4CD}";
         const isSelected = selectedPlace?.id === place.id;
@@ -198,7 +213,7 @@ export default function Map({
         );
       })}
 
-      {selectedPlace && (
+      {!discoverPins?.length && selectedPlace && (
         <Popup
           longitude={selectedPlace.lng}
           latitude={selectedPlace.lat}
@@ -262,6 +277,82 @@ export default function Map({
             />
           </div>
         </Marker>
+      )}
+
+      {/* Discover pins from Infatuation guides */}
+      {discoverPins?.map((pin, i) => {
+        const isDiscoverSelected = selectedDiscoverIndex === i;
+        const pinColor = pin.alreadyInList ? "#5b7b9a" : "#c47d2e";
+        return (
+          <Marker
+            key={`discover-${i}-${pin.lat}-${pin.lng}`}
+            longitude={pin.lng}
+            latitude={pin.lat}
+            anchor="bottom"
+            onClick={(e) => {
+              e.originalEvent.stopPropagation();
+              onSelectDiscoverPin?.(isDiscoverSelected ? null : i);
+            }}
+          >
+            <div
+              className={`flex cursor-pointer flex-col items-center transition-transform duration-150 ${
+                isDiscoverSelected ? "scale-125" : "hover:scale-110"
+              }`}
+            >
+              <div
+                className="flex items-center justify-center rounded-full"
+                style={{
+                  width: isDiscoverSelected ? 30 : 26,
+                  height: isDiscoverSelected ? 30 : 26,
+                  backgroundColor: "#faf6f1",
+                  border: `2px solid ${pinColor}`,
+                  boxShadow: isDiscoverSelected
+                    ? `0 0 0 2px ${pinColor}, 0 2px 8px rgba(0,0,0,0.25)`
+                    : "0 1px 3px rgba(0,0,0,0.12)",
+                  fontSize: pin.rating != null ? "9px" : "12px",
+                  fontWeight: 700,
+                  color: pin.alreadyInList ? "#5b7b9a" : "#c47d2e",
+                  fontFamily: "var(--font-dm-sans)",
+                }}
+              >
+                {pin.rating != null ? pin.rating.toFixed(1) : "\u{1F374}"}
+              </div>
+              <div
+                className="h-0 w-0"
+                style={{
+                  borderLeft: "4px solid transparent",
+                  borderRight: "4px solid transparent",
+                  borderTop: `4px solid ${pinColor}`,
+                  marginTop: "-1px",
+                }}
+              />
+            </div>
+          </Marker>
+        );
+      })}
+
+      {/* Popup for selected discover pin */}
+      {selectedDiscoverIndex != null && discoverPins?.[selectedDiscoverIndex] && (
+        <Popup
+          longitude={discoverPins[selectedDiscoverIndex].lng}
+          latitude={discoverPins[selectedDiscoverIndex].lat}
+          anchor="bottom"
+          offset={35}
+          onClose={() => onSelectDiscoverPin?.(null)}
+          closeOnClick={false}
+        >
+          <div className="max-w-[200px]">
+            <p
+              className="font-semibold text-[var(--color-ink)]"
+              style={{
+                fontFamily: "var(--font-libre-baskerville)",
+                fontSize: "13px",
+              }}
+            >
+              {discoverPins[selectedDiscoverIndex].name}
+            </p>
+          </div>
+        </Popup>
       )}
     </MapGL>
   );

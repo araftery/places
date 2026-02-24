@@ -4,8 +4,10 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { Place, Tag, City, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 import ReviewBanner from "./ReviewBanner";
+import DiscoverPanel from "./DiscoverPanel";
+import type { DiscoverPin } from "./DiscoverPanel";
 import { Filters, DEFAULT_FILTERS, applyFilters, SortOption } from "./Sidebar";
-import type { TravelTimeBand } from "@/app/page";
+import type { TravelTimeBand } from "@/lib/geo";
 
 interface MobileBottomSheetProps {
   places: Place[];
@@ -25,6 +27,12 @@ interface MobileBottomSheetProps {
   selectedCityId: number | null;
   onCityChange: (cityId: number | null) => void;
   isochroneActive?: boolean;
+  isoGeoJson?: GeoJSON.FeatureCollection | null;
+  allPlaces?: Place[];
+  onPlaceAdded?: () => void;
+  onDiscoverPinsChange?: (pins: DiscoverPin[]) => void;
+  selectedDiscoverIndex?: number | null;
+  onSelectDiscoverIndex?: (index: number | null) => void;
 }
 
 export default function MobileBottomSheet({
@@ -45,11 +53,18 @@ export default function MobileBottomSheet({
   selectedCityId,
   onCityChange,
   isochroneActive,
+  isoGeoJson,
+  allPlaces,
+  onPlaceAdded,
+  onDiscoverPinsChange,
+  selectedDiscoverIndex,
+  onSelectDiscoverIndex,
 }: MobileBottomSheetProps) {
   const [expanded, setExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [preSortBy, setPreSortBy] = useState<SortOption>("recent");
+  const [activeTab, setActiveTab] = useState<"places" | "discover">("places");
 
   const prevIsoRef = useRef(false);
   useEffect(() => {
@@ -87,6 +102,30 @@ export default function MobileBottomSheet({
     }
     return sorted;
   }, [filteredPlaces, sortBy, travelTimes]);
+
+  const selectedCity = useMemo(
+    () => (selectedCityId ? cities.find((c) => c.id === selectedCityId) : null),
+    [selectedCityId, cities]
+  );
+  const hasDiscover = !!selectedCity?.infatuationSlug;
+
+  useEffect(() => {
+    if (!hasDiscover && activeTab === "discover") {
+      setActiveTab("places");
+    }
+  }, [hasDiscover]);
+
+  const tabMountedRef = useRef(false);
+  useEffect(() => {
+    // Only clear pins when actively switching away from discover, not on mount
+    if (!tabMountedRef.current) {
+      tabMountedRef.current = true;
+      return;
+    }
+    if (activeTab === "places" && onDiscoverPinsChange) {
+      onDiscoverPinsChange([]);
+    }
+  }, [activeTab]);
 
   return (
     <div
@@ -161,20 +200,65 @@ export default function MobileBottomSheet({
         </button>
       </div>
 
+      {/* Tab bar */}
+      {hasDiscover && (
+        <div className="flex gap-4 px-4 pb-2">
+          <button
+            onClick={() => setActiveTab("places")}
+            className={`pb-1 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+              activeTab === "places"
+                ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
+                : "text-[var(--color-sidebar-muted)]"
+            }`}
+          >
+            My Places
+          </button>
+          <button
+            onClick={() => setActiveTab("discover")}
+            className={`pb-1 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+              activeTab === "discover"
+                ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
+                : "text-[var(--color-sidebar-muted)]"
+            }`}
+          >
+            Discover
+          </button>
+        </div>
+      )}
+
+      {/* Discover Panel */}
+      {activeTab === "discover" && hasDiscover && selectedCity?.infatuationSlug && onDiscoverPinsChange && (
+        <div className="flex-1 overflow-y-auto py-2 sidebar-scroll">
+          <DiscoverPanel
+            citySlug={selectedCity.infatuationSlug}
+            cityId={selectedCity.id}
+            existingPlaces={allPlaces || places}
+            onPlaceAdded={onPlaceAdded || (() => {})}
+            onDiscoverPinsChange={onDiscoverPinsChange}
+            selectedDiscoverIndex={selectedDiscoverIndex ?? null}
+            onSelectDiscoverIndex={onSelectDiscoverIndex || (() => {})}
+            isoGeoJson={isoGeoJson}
+            onOpenPlace={onSelectPlace}
+          />
+        </div>
+      )}
+
       {/* Search */}
-      <div className="px-4 pb-2">
-        <input
-          value={filters.search}
-          onChange={(e) =>
-            onFiltersChange({ ...filters, search: e.target.value })
-          }
-          className="w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-3 py-1.5 text-sm text-[var(--color-sidebar-text)] placeholder-[var(--color-sidebar-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-          placeholder="Search places..."
-        />
-      </div>
+      {activeTab === "places" && (
+        <div className="px-4 pb-2">
+          <input
+            value={filters.search}
+            onChange={(e) =>
+              onFiltersChange({ ...filters, search: e.target.value })
+            }
+            className="w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-3 py-1.5 text-sm text-[var(--color-sidebar-text)] placeholder-[var(--color-sidebar-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+            placeholder="Search places..."
+          />
+        </div>
+      )}
 
       {/* Mobile Filters */}
-      {showFilters && (
+      {activeTab === "places" && showFilters && (
         <div className="space-y-2 border-t border-[var(--color-sidebar-border)] px-4 py-3">
           <div className="flex flex-wrap gap-1.5">
             <button
@@ -276,7 +360,7 @@ export default function MobileBottomSheet({
       )}
 
       {/* Review Banner */}
-      {onReviewArchive && onReviewDismissClosed && (
+      {activeTab === "places" && onReviewArchive && onReviewDismissClosed && (
         <ReviewBanner
           closedPlaces={reviewClosed}
           stalePlaces={reviewStale}
@@ -287,40 +371,42 @@ export default function MobileBottomSheet({
       )}
 
       {/* Sort + Place list */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 sidebar-scroll">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-            {sortedPlaces.length} place{sortedPlaces.length !== 1 ? "s" : ""}
-          </p>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="appearance-none bg-transparent text-[11px] font-medium text-[var(--color-sidebar-muted)] cursor-pointer pr-4 focus:outline-none"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='%238a7e72' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 0 center",
-            }}
-          >
-            <option value="recent">Recently added</option>
-            <option value="rating">Highest rated</option>
-            <option value="name">Name A–Z</option>
-            {isochroneActive && <option value="nearest">Nearest</option>}
-          </select>
+      {activeTab === "places" && (
+        <div className="flex-1 overflow-y-auto px-4 pb-4 sidebar-scroll">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+              {sortedPlaces.length} place{sortedPlaces.length !== 1 ? "s" : ""}
+            </p>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="appearance-none bg-transparent text-[11px] font-medium text-[var(--color-sidebar-muted)] cursor-pointer pr-4 focus:outline-none"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='%238a7e72' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 0 center",
+              }}
+            >
+              <option value="recent">Recently added</option>
+              <option value="rating">Highest rated</option>
+              <option value="name">Name A–Z</option>
+              {isochroneActive && <option value="nearest">Nearest</option>}
+            </select>
+          </div>
+          <div className="space-y-2">
+            {sortedPlaces.map((place) => (
+              <PlaceCard
+                key={place.id}
+                place={place}
+                isSelected={selectedPlace?.id === place.id}
+                onClick={() => onSelectPlace(place)}
+                travelTime={travelTimes?.get(place.id)}
+                compact={sortedPlaces.length >= 10}
+              />
+            ))}
+          </div>
         </div>
-        <div className="space-y-2">
-          {sortedPlaces.map((place) => (
-            <PlaceCard
-              key={place.id}
-              place={place}
-              isSelected={selectedPlace?.id === place.id}
-              onClick={() => onSelectPlace(place)}
-              travelTime={travelTimes?.get(place.id)}
-              compact={sortedPlaces.length >= 10}
-            />
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
