@@ -56,6 +56,7 @@ export interface GuideRestaurant {
   addedDate: string | null;
   reviewSlug: string;
   canonicalPath: string | null;
+  imageUrl: string | null;
   venue: GuideVenue;
 }
 
@@ -353,6 +354,7 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
                   sys { firstPublishedAt }
                   headline
                   content { json }
+                  gallery { assets }
                   review {
                     title
                     rating
@@ -378,6 +380,7 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
                       sys { firstPublishedAt }
                       headline
                       content { json }
+                      gallery { assets }
                       review {
                         title
                         rating
@@ -452,6 +455,12 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
       const neighborhoodTags = (review.neighborhoodTagsCollection as Record<string, unknown>)?.items as Array<Record<string, string>> | undefined;
       const neighborhood = neighborhoodTags?.[0]?.displayName || null;
 
+      // Extract first image from gallery assets (Cloudinary JSON)
+      const gallery = caption.gallery as Record<string, unknown> | null;
+      const assets = gallery?.assets as Array<Record<string, unknown>> | null;
+      const firstAsset = assets?.[0];
+      const imageUrl = (firstAsset?.secure_url as string) || (firstAsset?.url as string) || null;
+
       restaurants.push({
         headline: (caption.headline as string) || null,
         title: (review.title as string) || "",
@@ -463,6 +472,7 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
         addedDate: sys?.firstPublishedAt || null,
         reviewSlug: reviewSlug?.name || "",
         canonicalPath: (review.canonicalPath as string) || null,
+        imageUrl,
         venue: {
           name: (venue?.name as string) || "",
           street: (venue?.street as string) || null,
