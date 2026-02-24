@@ -63,6 +63,17 @@ export default function Home() {
     setPlaces(data);
   }, []);
 
+  // Optimistically add a newly-created place to local state
+  const handleDiscoverPlaceAdded = useCallback((newPlace: Place) => {
+    setPlaces((prev) => {
+      // Avoid duplicates if background refresh already added it
+      if (prev.some((p) => p.id === newPlace.id)) return prev;
+      return [...prev, newPlace];
+    });
+    // Background refresh to get any data we may be missing
+    fetchPlaces();
+  }, [fetchPlaces]);
+
   const fetchTags = useCallback(async () => {
     const res = await fetch("/api/tags");
     const data = await res.json();
@@ -310,7 +321,6 @@ export default function Home() {
 
   function handleDiscoverPinsChange(pins: { lat: number; lng: number; name: string; rating: number | null; alreadyInList: boolean; matchedPlaceId: number | null }[]) {
     setDiscoverPins(pins);
-    setSelectedDiscoverIndex(null);
   }
 
   function handlePlacePreview(location: { lat: number; lng: number; name: string } | null) {
@@ -417,7 +427,7 @@ export default function Home() {
           isochroneActive={!!isoGeoJson}
           isoGeoJson={isoGeoJson}
           allPlaces={places}
-          onPlaceAdded={fetchPlaces}
+          onPlaceAdded={handleDiscoverPlaceAdded}
           onDiscoverPinsChange={handleDiscoverPinsChange}
           selectedDiscoverIndex={selectedDiscoverIndex}
           onSelectDiscoverIndex={handleSelectDiscoverIndex}
@@ -522,7 +532,7 @@ export default function Home() {
           isochroneActive={!!isoGeoJson}
           isoGeoJson={isoGeoJson}
           allPlaces={places}
-          onPlaceAdded={fetchPlaces}
+          onPlaceAdded={handleDiscoverPlaceAdded}
           onDiscoverPinsChange={handleDiscoverPinsChange}
           selectedDiscoverIndex={selectedDiscoverIndex}
           onSelectDiscoverIndex={handleSelectDiscoverIndex}

@@ -29,7 +29,7 @@ interface MobileBottomSheetProps {
   isochroneActive?: boolean;
   isoGeoJson?: GeoJSON.FeatureCollection | null;
   allPlaces?: Place[];
-  onPlaceAdded?: () => void;
+  onPlaceAdded?: (place: Place) => void;
   onDiscoverPinsChange?: (pins: DiscoverPin[]) => void;
   selectedDiscoverIndex?: number | null;
   onSelectDiscoverIndex?: (index: number | null) => void;
@@ -218,7 +218,7 @@ export default function MobileBottomSheet({
             citySlug={selectedCity.infatuationSlug}
             cityId={selectedCity.id}
             existingPlaces={allPlaces || places}
-            onPlaceAdded={onPlaceAdded || (() => {})}
+            onPlaceAdded={onPlaceAdded || (() => { /* noop */ })}
             onDiscoverPinsChange={onDiscoverPinsChange}
             selectedDiscoverIndex={selectedDiscoverIndex ?? null}
             onSelectDiscoverIndex={onSelectDiscoverIndex || (() => {})}

@@ -19,7 +19,7 @@ interface DiscoverPanelProps {
   citySlug: string;
   cityId: number;
   existingPlaces: Place[];
-  onPlaceAdded: () => void;
+  onPlaceAdded: (place: Place) => void;
   onDiscoverPinsChange: (pins: DiscoverPin[]) => void;
   selectedDiscoverIndex: number | null;
   onSelectDiscoverIndex: (index: number | null) => void;
@@ -48,69 +48,34 @@ export default function DiscoverPanel({
   const [addStatuses, setAddStatuses] = useState<Record<string, AddStatus>>({});
   const [addedSlugs, setAddedSlugs] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [pendingOpenPlaceId, setPendingOpenPlaceId] = useState<number | null>(null);
-
-  const existingNames = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of existingPlaces) {
-      set.add(p.name.toLowerCase());
-    }
-    return set;
-  }, [existingPlaces]);
-
   // Match by Infatuation review slug from place_ratings
   const existingInfatuationSlugs = useMemo(() => {
-    const set = new Set<string>();
+    const map = new Map<string, Place>();
     for (const p of existingPlaces) {
       for (const r of p.ratings || []) {
         if (r.source === "infatuation" && r.externalId) {
-          set.add(r.externalId);
+          map.set(r.externalId, p);
         }
       }
     }
-    return set;
+    return map;
   }, [existingPlaces]);
 
   // Find the matching Place for a discover restaurant
   const findMatchingPlace = useCallback(
     (restaurant: GuideRestaurant): Place | null => {
-      // Match by Infatuation slug first
-      if (restaurant.reviewSlug) {
-        const match = existingPlaces.find((p) =>
-          p.ratings?.some(
-            (r) => r.source === "infatuation" && r.externalId === restaurant.reviewSlug
-          )
-        );
-        if (match) return match;
-      }
-      // Fallback: match by name
-      const name = (restaurant.venue.name || restaurant.title).toLowerCase();
-      return existingPlaces.find((p) => p.name.toLowerCase() === name) || null;
+      if (!restaurant.reviewSlug) return null;
+      return existingInfatuationSlugs.get(restaurant.reviewSlug) ?? null;
     },
-    [existingPlaces]
+    [existingInfatuationSlugs]
   );
 
   const isAlreadyInList = useCallback(
     (restaurant: GuideRestaurant) => {
-      // Primary: match by Infatuation review slug
-      if (restaurant.reviewSlug && existingInfatuationSlugs.has(restaurant.reviewSlug)) {
-        return true;
-      }
-      // Fallback: match by name
-      return existingNames.has((restaurant.venue.name || restaurant.title).toLowerCase());
+      return !!restaurant.reviewSlug && existingInfatuationSlugs.has(restaurant.reviewSlug);
     },
-    [existingInfatuationSlugs, existingNames]
+    [existingInfatuationSlugs]
   );
-
-  // Auto-open newly added place once it appears in existingPlaces
-  useEffect(() => {
-    if (pendingOpenPlaceId == null || !onOpenPlace) return;
-    const place = existingPlaces.find((p) => p.id === pendingOpenPlaceId);
-    if (place) {
-      setPendingOpenPlaceId(null);
-      onOpenPlace(place);
-    }
-  }, [pendingOpenPlaceId, existingPlaces, onOpenPlace]);
 
   // Fetch guides for city
   useEffect(() => {
@@ -277,7 +242,13 @@ export default function DiscoverPanel({
   }, [sortedRestaurants, isAlreadyInList, findMatchingPlace]);
 
   const handleAdd = useCallback(
-    async (restaurant: GuideRestaurant) => {
+    async (restaurant: GuideRestaurant, restaurantIndex: number) => {
+      // Select this card + enlarge the map pin immediately
+      const pinIndex = restaurantToPinIndex.get(restaurantIndex);
+      if (pinIndex != null) {
+        onSelectDiscoverIndex(pinIndex);
+      }
+
       const key = restaurant.reviewSlug || restaurant.venue.name;
       setAddStatuses((prev) => ({ ...prev, [key]: "adding" }));
       setErrors((prev) => {
@@ -296,6 +267,7 @@ export default function DiscoverPanel({
             lng: restaurant.venue.lng,
             cityId,
             source: `Infatuation: ${selectedGuide?.title || "Guide"}`,
+            reviewSlug: restaurant.reviewSlug || null,
           }),
         });
 
@@ -316,18 +288,20 @@ export default function DiscoverPanel({
           return;
         }
 
+        // Optimistic: build a Place from the response and immediately surface it
+        const newPlace: Place = data.place;
         setAddStatuses((prev) => ({ ...prev, [key]: "added" }));
         setAddedSlugs((prev) => new Set(prev).add(key));
-        if (data.place?.id) {
-          setPendingOpenPlaceId(data.place.id);
+        onPlaceAdded(newPlace);
+        if (onOpenPlace) {
+          onOpenPlace(newPlace);
         }
-        onPlaceAdded();
       } catch {
         setAddStatuses((prev) => ({ ...prev, [key]: "no-match" }));
         setErrors((prev) => ({ ...prev, [key]: "Failed to add" }));
       }
     },
-    [cityId, selectedGuide, onPlaceAdded]
+    [cityId, selectedGuide, onPlaceAdded, onOpenPlace, restaurantToPinIndex, onSelectDiscoverIndex]
   );
 
   const handleBack = useCallback(() => {
@@ -465,7 +439,7 @@ export default function DiscoverPanel({
                       status={addStatuses[key] || "idle"}
                       error={errors[key] || null}
                       alreadyInList={isAlreadyInList(restaurant)}
-                      onAdd={() => handleAdd(restaurant)}
+                      onAdd={() => handleAdd(restaurant, i)}
                       isSelected={isSelected}
                       onClick={() => handleSelectRestaurant(i, restaurant)}
                       showDate
