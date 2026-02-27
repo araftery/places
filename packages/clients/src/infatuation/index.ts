@@ -293,51 +293,54 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
 
   async function listGuides(canonicalPath: string): Promise<GuideListItem[]> {
     const graphqlQuery = `
-      query getGuides($canonicalPath: String!, $enableSitewideSearch: Boolean!) {
-        searchPosts(input: {
-          canonicalPathText: $canonicalPath
-          postCategoryTypeText: [POST_GUIDE]
-          enableSitewideSearch: $enableSitewideSearch
-          searchText: ""
-        }) {
-          nodes {
-            documentTitleText
-            slugName
-            canonicalPathText
-            publishedTimestamp
-            previewText
+      query ($canonicalPath: String!) {
+        postGuideCollection(
+          limit: 500
+          where: { canonicalPath: $canonicalPath }
+          order: sys_publishedAt_DESC
+        ) {
+          items {
+            title
+            slug { name }
+            canonicalPath
+            preview
+            sys { publishedAt }
           }
         }
       }
     `;
 
-    const res = await fetchFn(PSS_ENDPOINT, {
+    const res = await fetchFn(CONTENTFUL_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         query: graphqlQuery,
-        variables: {
-          canonicalPath,
-          enableSitewideSearch: true,
-        },
+        variables: { canonicalPath },
       }),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Infatuation PSS listGuides error: ${text}`);
+      throw new Error(`Infatuation Contentful listGuides error: ${text}`);
     }
 
     const data = await res.json();
-    const nodes = data?.data?.searchPosts?.nodes ?? [];
+    const items = data?.data?.postGuideCollection?.items ?? [];
 
-    return nodes.map((n: Record<string, unknown>) => ({
-      slug: n.slugName as string,
-      title: n.documentTitleText as string,
-      canonicalPath: n.canonicalPathText as string,
-      previewText: (n.previewText as string) || null,
-      publishedAt: (n.publishedTimestamp as string) || null,
-    }));
+    return items.map((item: Record<string, unknown>) => {
+      const slug = item.slug as Record<string, string> | null;
+      const sys = item.sys as Record<string, string> | null;
+      return {
+        slug: slug?.name || "",
+        title: (item.title as string) || "",
+        canonicalPath: (item.canonicalPath as string) || "",
+        previewText: (item.preview as string) || null,
+        publishedAt: sys?.publishedAt || null,
+      };
+    });
   }
 
   async function getGuideContent(slug: string): Promise<GuideContent> {
