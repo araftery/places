@@ -312,6 +312,7 @@ ${embedsStr || "(none)"}`;
 
     const geminiResult = await model.generateContent(userPrompt);
     const text = geminiResult.response.text();
+    console.log("[website-scanner] Gemini full response:", text);
     const parsed = JSON.parse(text);
 
     result.provider = parsed.provider ?? null;

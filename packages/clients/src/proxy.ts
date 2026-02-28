@@ -13,7 +13,7 @@ export function createFetch(proxyUrl?: string): typeof globalThis.fetch {
 
   const dispatcher = new ProxyAgent(proxyUrl);
 
-  return ((input: RequestInfo | URL, init?: RequestInit) => {
+  return ((input: string | URL | Request, init?: RequestInit) => {
     return globalThis.fetch(input, {
       ...init,
       // @ts-expect-error undici dispatcher is compatible at runtime

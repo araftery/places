@@ -80,6 +80,9 @@ vi.mock("../../utils/clients", () => ({
 
 import { auditNytTask } from "../../trigger/audit-nyt";
 
+// The mock returns the raw options object (which has .run), so we cast to any
+const task = auditNytTask as any;
+
 describe("audit-nyt task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,7 +92,7 @@ describe("audit-nyt task", () => {
   it("exits early when no audits are due", async () => {
     mockSelectFrom.mockResolvedValueOnce([]);
 
-    await auditNytTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeNyt).not.toHaveBeenCalled();
   });
@@ -112,7 +115,7 @@ describe("audit-nyt task", () => {
       placeData: null,
     });
 
-    await auditNytTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeNyt).toHaveBeenCalledWith(
       expect.objectContaining({ id: 10, name: "Place A", cityName: "New York" }),
@@ -128,7 +131,7 @@ describe("audit-nyt task", () => {
     ]);
     mockSelectFromWhere.mockResolvedValueOnce([]);
 
-    await auditNytTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeNyt).not.toHaveBeenCalled();
   });
@@ -142,7 +145,7 @@ describe("audit-nyt task", () => {
 
     mockScrapeNyt.mockRejectedValue(new Error("timeout"));
 
-    await auditNytTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockMarkAuditFailed).toHaveBeenCalledWith(10, "nyt", "timeout");
   });
@@ -162,7 +165,7 @@ describe("audit-nyt task", () => {
       placeData: null,
     });
 
-    await auditNytTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeNyt).toHaveBeenCalledWith(
       expect.objectContaining({ cityName: null }),

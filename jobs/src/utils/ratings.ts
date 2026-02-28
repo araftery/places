@@ -17,6 +17,7 @@ export interface ScrapeResult {
     externalId: string | null;
   } | null;
   placeData: Record<string, unknown> | null;
+  extra?: Record<string, unknown>;
 }
 
 export async function upsertRating(

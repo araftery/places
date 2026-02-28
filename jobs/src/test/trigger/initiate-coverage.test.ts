@@ -82,6 +82,9 @@ vi.mock("../../utils/clients", () => ({
 
 import { initiateCoverageTask } from "../../trigger/initiate-coverage";
 
+// The mock returns the raw options object (which has .run), so we cast to any
+const task = initiateCoverageTask as any;
+
 const fakePlace = {
   id: 1,
   name: "Test Place",
@@ -107,7 +110,7 @@ describe("initiate-coverage task", () => {
   it("aborts when place is not found", async () => {
     mockSelectWhere.mockResolvedValueOnce([]); // place lookup
 
-    await initiateCoverageTask.run({ placeId: 999 });
+    await task.run({ placeId: 999 });
 
     expect(mockScrapeGoogle).not.toHaveBeenCalled();
   });
@@ -147,7 +150,7 @@ describe("initiate-coverage task", () => {
     mockScrapeBeli.mockResolvedValue(beliResult);
     mockScrapeNyt.mockResolvedValue(nytResult);
 
-    await initiateCoverageTask.run({ placeId: 1 });
+    await task.run({ placeId: 1 });
 
     expect(mockScrapeGoogle).toHaveBeenCalled();
     expect(mockScrapeInfatuation).toHaveBeenCalled();
@@ -170,7 +173,7 @@ describe("initiate-coverage task", () => {
       placeData: null,
     });
 
-    await initiateCoverageTask.run({ placeId: 1 });
+    await task.run({ placeId: 1 });
 
     expect(mockScrapeGoogle).toHaveBeenCalled();
     expect(mockScrapeInfatuation).not.toHaveBeenCalled();
@@ -193,7 +196,7 @@ describe("initiate-coverage task", () => {
       found: false, externalId: null, ratingData: null, placeData: null,
     });
 
-    await initiateCoverageTask.run({ placeId: 1 });
+    await task.run({ placeId: 1 });
 
     expect(mockScrapeInfatuation).not.toHaveBeenCalled();
   });
@@ -205,7 +208,7 @@ describe("initiate-coverage task", () => {
 
     mockScrapeGoogle.mockRejectedValue(new Error("API timeout"));
 
-    await initiateCoverageTask.run({ placeId: 1 });
+    await task.run({ placeId: 1 });
 
     expect(mockMarkAuditFailed).toHaveBeenCalledWith(1, "google", "API timeout");
   });
@@ -222,7 +225,7 @@ describe("initiate-coverage task", () => {
       placeData: { hoursJson: { periods: [] }, closedPermanently: false },
     });
 
-    await initiateCoverageTask.run({ placeId: 1 });
+    await task.run({ placeId: 1 });
 
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({

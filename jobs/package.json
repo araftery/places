@@ -11,12 +11,15 @@
     "test:live": "npx tsx src/live/google.live.ts && npx tsx src/live/beli.live.ts && npx tsx src/live/infatuation.live.ts && npx tsx src/live/nyt.live.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@places/clients": "workspace:*",
     "@places/db": "workspace:*",
     "@trigger.dev/sdk": "4.4.1",
-    "drizzle-orm": "^0.45.1"
+    "drizzle-orm": "^0.45.1",
+    "playwright": "^1.58.2"
   },
   "devDependencies": {
+    "@trigger.dev/build": "4.4.1",
     "@types/node": "^20",
     "dotenv": "^16.4.7",
     "typescript": "5.9.3",

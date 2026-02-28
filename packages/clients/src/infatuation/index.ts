@@ -1,5 +1,137 @@
-import type { SearchResult, LookupResult } from "../types.js";
+import { z } from "zod";
+import type { SearchResult, LookupResult } from "../types";
 import { createFetch } from "../proxy";
+
+// ── Zod Schemas ──────────────────────────────────────────────────
+
+const PssNodeSchema = z.object({
+  __typename: z.string(),
+  documentTitleText: z.string().optional(),
+  documentIdentifier: z.string().optional(),
+  canonicalPathText: z.string().optional(),
+  slugName: z.string().optional(),
+  publishedTimestamp: z.string().optional(),
+  previewText: z.string().optional(),
+  placeName: z.string().optional(),
+  placeStreetName: z.string().optional(),
+  placeAddressPostalCode: z.string().optional(),
+  placeCityName: z.string().optional(),
+  placeStateName: z.string().optional(),
+  placePriceIndicatorCode: z.string().optional(),
+  placeRatingNumber: z.number().optional(),
+  placeKnownTelephoneNumber: z.string().optional(),
+  placeLocation: z.object({
+    latitudeNumber: z.number(),
+    longitudeNumber: z.number(),
+  }).passthrough().optional(),
+}).passthrough();
+
+const PssSearchResponseSchema = z.object({
+  data: z.object({
+    searchPosts: z.object({
+      nodes: z.array(PssNodeSchema).default([]),
+    }).passthrough(),
+  }).passthrough(),
+}).passthrough();
+
+const ContentfulVenueSchema = z.object({
+  name: z.string().optional(),
+  street: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  postalCode: z.string().optional(),
+  price: z.number().optional(),
+  closed: z.unknown().optional(),
+  closedStatus: z.string().optional(),
+  phone: z.string().optional(),
+  instagram: z.string().optional(),
+  url: z.string().optional(),
+  latlong: z.object({ lat: z.number(), lon: z.number() }).passthrough().optional(),
+  reservation: z.object({
+    reservationUrl: z.string().optional(),
+    reservationPlatform: z.string().optional(),
+  }).passthrough().optional(),
+}).passthrough();
+
+const ContentfulReviewItemSchema = z.object({
+  title: z.string().optional(),
+  rating: z.number().optional(),
+  headline: z.string().optional(),
+  preview: z.string().optional(),
+  publishDate: z.string().optional(),
+  canonicalPath: z.string().optional(),
+  slug: z.object({ name: z.string() }).passthrough().optional(),
+  status: z.string().optional(),
+  venue: ContentfulVenueSchema.optional(),
+  neighborhoodTagsCollection: z.object({
+    items: z.array(z.object({
+      displayName: z.string().optional(),
+      name: z.string().optional(),
+    }).passthrough()).default([]),
+  }).passthrough().optional(),
+  cuisineTagsCollection: z.object({
+    items: z.array(z.object({ name: z.string() }).passthrough()).default([]),
+  }).passthrough().optional(),
+  perfectForCollection: z.object({
+    items: z.array(z.object({ name: z.string() }).passthrough()).default([]),
+  }).passthrough().optional(),
+  contributorCollection: z.object({
+    items: z.array(z.object({
+      name: z.string().optional(),
+      slug: z.object({ name: z.string() }).passthrough().optional(),
+    }).passthrough()).default([]),
+  }).passthrough().optional(),
+}).passthrough();
+
+const ContentfulLookupResponseSchema = z.object({
+  data: z.object({
+    postReviewCollection: z.object({
+      items: z.array(ContentfulReviewItemSchema).default([]),
+    }).passthrough(),
+  }).passthrough(),
+}).passthrough();
+
+const ListCitiesResponseSchema = z.object({
+  data: z.object({
+    cityCollection: z.object({
+      items: z.array(z.object({
+        name: z.string(),
+        cityPath: z.string(),
+      }).passthrough()).default([]),
+    }).passthrough(),
+  }).passthrough(),
+}).passthrough();
+
+const ListGuidesItemSchema = z.object({
+  title: z.string().optional(),
+  slug: z.object({ name: z.string() }).passthrough().optional(),
+  canonicalPath: z.string().optional(),
+  preview: z.string().optional(),
+  sys: z.object({ publishedAt: z.string().optional() }).passthrough().optional(),
+}).passthrough();
+
+const ListGuidesResponseSchema = z.object({
+  data: z.object({
+    postGuideCollection: z.object({
+      items: z.array(ListGuidesItemSchema).default([]),
+    }).passthrough(),
+  }).passthrough(),
+}).passthrough();
+
+// Guide content: validate the envelope but keep inner caption items loosely typed
+const GuideContentResponseSchema = z.object({
+  data: z.object({
+    postGuideCollection: z.object({
+      items: z.array(z.object({
+        title: z.string().optional(),
+        slug: z.object({ name: z.string() }).passthrough().optional(),
+        contentV2BodyCollection: z.object({
+          items: z.array(z.record(z.string(), z.unknown())).default([]),
+        }).passthrough().optional(),
+      }).passthrough()).default([]),
+    }).passthrough(),
+  }).passthrough(),
+}).passthrough();
 
 const CONTENTFUL_ENDPOINT =
   "https://graphql.contentful.com/content/v1/spaces/by7j1x5pisip/environments/master";
@@ -131,22 +263,22 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
       throw new Error(`Infatuation PSS search error: ${text}`);
     }
 
-    const data = await res.json();
-    const nodes = data?.data?.searchPosts?.nodes ?? [];
+    const data = PssSearchResponseSchema.parse(await res.json());
+    const nodes = data.data.searchPosts.nodes;
 
     return nodes
-      .filter((n: Record<string, unknown>) => n.__typename === "PostReview")
-      .map((n: Record<string, unknown>) => ({
-        externalId: n.slugName as string,
+      .filter((n) => n.__typename === "PostReview")
+      .map((n) => ({
+        externalId: n.slugName!,
         provider: "infatuation" as const,
-        name: (n.placeName as string) || (n.documentTitleText as string),
-        summary: (n.previewText as string) || null,
-        rating: (n.placeRatingNumber as number) || null,
+        name: n.placeName || n.documentTitleText || "",
+        summary: n.previewText || null,
+        rating: n.placeRatingNumber || null,
         ratingScale: "0-10",
-        priceLevel: mapPrice(n.placePriceIndicatorCode as string),
+        priceLevel: mapPrice(n.placePriceIndicatorCode),
         cuisines: [],
-        lat: (n.placeLocation as Record<string, number>)?.latitudeNumber ?? null,
-        lng: (n.placeLocation as Record<string, number>)?.longitudeNumber ?? null,
+        lat: n.placeLocation?.latitudeNumber ?? null,
+        lng: n.placeLocation?.longitudeNumber ?? null,
         neighborhood: null,
         url: `https://www.theinfatuation.com${n.canonicalPathText}/reviews/${n.slugName}`,
       }));
@@ -216,38 +348,38 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
       throw new Error(`Infatuation Contentful lookup error: ${text}`);
     }
 
-    const data = await res.json();
-    const item = data?.data?.postReviewCollection?.items?.[0];
+    const data = ContentfulLookupResponseSchema.parse(await res.json());
+    const item = data.data.postReviewCollection.items[0];
 
     if (!item) {
       throw new Error(`No Infatuation review found for slug: ${slug}`);
     }
 
-    const venue = item.venue || {};
-    const cuisines = (item.cuisineTagsCollection?.items || []).map(
-      (c: { name: string }) => c.name
+    const venue = item.venue;
+    const cuisines = (item.cuisineTagsCollection?.items ?? []).map(
+      (c) => c.name
     );
-    const neighborhoods = (item.neighborhoodTagsCollection?.items || []).map(
-      (n: { displayName?: string; name: string }) => n.displayName || n.name
+    const neighborhoods = (item.neighborhoodTagsCollection?.items ?? []).map(
+      (n) => n.displayName || n.name || ""
     );
     const contributor = item.contributorCollection?.items?.[0];
 
     return {
       externalId: item.slug?.name || slug,
       provider: "infatuation",
-      name: venue.name || item.title,
+      name: venue?.name || item.title || "",
       summary: item.preview || item.headline || null,
       rating: item.rating ?? null,
       ratingScale: "0-10",
-      priceLevel: venue.price ?? null,
+      priceLevel: venue?.price ?? null,
       cuisines,
-      lat: venue.latlong?.lat ?? null,
-      lng: venue.latlong?.lon ?? null,
+      lat: venue?.latlong?.lat ?? null,
+      lng: venue?.latlong?.lon ?? null,
       neighborhood: neighborhoods[0] || null,
       url: `https://www.theinfatuation.com${item.canonicalPath}/reviews/${item.slug?.name}`,
-      address: venue.street || null,
-      city: venue.city || null,
-      state: venue.state || null,
+      address: venue?.street || null,
+      city: venue?.city || null,
+      state: venue?.state || null,
       reviewer: contributor?.name || null,
       isCriticsPick: false,
       reviewDate: item.publishDate || null,
@@ -282,10 +414,9 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
       throw new Error(`Infatuation Contentful listCities error: ${text}`);
     }
 
-    const data = await res.json();
-    const items = data?.data?.cityCollection?.items ?? [];
+    const data = ListCitiesResponseSchema.parse(await res.json());
 
-    return items.map((item: { name: string; cityPath: string }) => ({
+    return data.data.cityCollection.items.map((item) => ({
       name: item.name,
       slug: item.cityPath,
     }));
@@ -327,20 +458,15 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
       throw new Error(`Infatuation Contentful listGuides error: ${text}`);
     }
 
-    const data = await res.json();
-    const items = data?.data?.postGuideCollection?.items ?? [];
+    const data = ListGuidesResponseSchema.parse(await res.json());
 
-    return items.map((item: Record<string, unknown>) => {
-      const slug = item.slug as Record<string, string> | null;
-      const sys = item.sys as Record<string, string> | null;
-      return {
-        slug: slug?.name || "",
-        title: (item.title as string) || "",
-        canonicalPath: (item.canonicalPath as string) || "",
-        previewText: (item.preview as string) || null,
-        publishedAt: sys?.publishedAt || null,
-      };
-    });
+    return data.data.postGuideCollection.items.map((item) => ({
+      slug: item.slug?.name || "",
+      title: item.title || "",
+      canonicalPath: item.canonicalPath || "",
+      previewText: item.preview || null,
+      publishedAt: item.sys?.publishedAt || null,
+    }));
   }
 
   async function getGuideContent(slug: string): Promise<GuideContent> {
@@ -426,8 +552,8 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
       throw new Error(`Infatuation Contentful getGuideContent error: ${text}`);
     }
 
-    const data = await res.json();
-    const item = data?.data?.postGuideCollection?.items?.[0];
+    const data = GuideContentResponseSchema.parse(await res.json());
+    const item = data.data.postGuideCollection.items[0];
 
     if (!item) {
       throw new Error(`No guide found for slug: ${slug}`);
@@ -489,7 +615,7 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
       });
     }
 
-    for (const ci of contentItems) {
+    for (const ci of contentItems as Array<Record<string, any>>) {
       if (ci.__typename === "Caption") {
         extractFromCaption(ci);
       } else if (ci.__typename === "CaptionGroup") {

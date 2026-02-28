@@ -54,9 +54,12 @@ describe("upsertRating", () => {
 
     await upsertRating(1, {
       source: "google",
-      rating: "4.5/5",
+      rating: 4.5,
+      ratingMax: 5,
       notes: "120 reviews",
+      reviewCount: 120,
       ratingUrl: null,
+      reviewDate: null,
       externalId: "ChIJ123",
     });
 
@@ -64,7 +67,8 @@ describe("upsertRating", () => {
       expect.objectContaining({
         placeId: 1,
         source: "google",
-        rating: "4.5/5",
+        rating: 4.5,
+        ratingMax: 5,
         notes: "120 reviews",
         externalId: "ChIJ123",
       })
@@ -73,20 +77,23 @@ describe("upsertRating", () => {
 
   it("updates existing rating", async () => {
     mockSelectWhere.mockResolvedValueOnce([
-      { id: 99, rating: "4.0/5", notes: "100 reviews", ratingUrl: null },
+      { id: 99, rating: 4.0, ratingMax: 5, notes: "100 reviews", reviewCount: 100, ratingUrl: null },
     ]);
 
     await upsertRating(1, {
       source: "google",
-      rating: "4.5/5",
+      rating: 4.5,
+      ratingMax: 5,
       notes: "120 reviews",
+      reviewCount: 120,
       ratingUrl: null,
+      reviewDate: null,
       externalId: "ChIJ123",
     });
 
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({
-        rating: "4.5/5",
+        rating: 4.5,
         notes: "120 reviews",
         externalId: "ChIJ123",
       })

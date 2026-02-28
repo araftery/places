@@ -1,4 +1,5 @@
 import { defineConfig } from "@trigger.dev/sdk";
+import { playwright } from "@trigger.dev/build/extensions/playwright";
 
 export default defineConfig({
   project: "proj_mncozrjaaxijmtqttsqx",
@@ -15,4 +16,8 @@ export default defineConfig({
     },
   },
   dirs: ["./src/trigger"],
+  build: {
+    external: ["playwright"],
+    extensions: [playwright()],
+  },
 });

@@ -68,6 +68,10 @@ describe("scrapeInfatuation", () => {
         externalId: "test-restaurant-nyc",
       },
       placeData: null,
+      extra: {
+        reservationPlatform: null,
+        reservationUrl: null,
+      },
     });
   });
 

@@ -1,5 +1,54 @@
-import type { SearchResult, LookupResult } from "../types.js";
+import { z } from "zod";
+import type { SearchResult, LookupResult } from "../types";
 import { createFetch } from "../proxy";
+
+// ── Zod Schemas ──────────────────────────────────────────────────
+
+const LoginResponseSchema = z.object({
+  access: z.string(),
+  refresh: z.string(),
+}).passthrough();
+
+const RefreshResponseSchema = z.object({
+  access: z.string(),
+}).passthrough();
+
+const PredictionSchema = z.object({
+  business: z.unknown().optional(),
+  place_id: z.unknown().optional(),
+  structured_formatting: z.object({
+    main_text: z.string().optional(),
+    secondary_text: z.string().optional(),
+  }).passthrough().optional(),
+}).passthrough();
+
+const SearchResponseSchema = z.object({
+  predictions: z.array(PredictionSchema).default([]),
+}).passthrough();
+
+const BusinessDetailsResponseSchema = z.object({
+  results: z.array(z.object({
+    id: z.unknown(),
+    name: z.string().optional(),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+    price: z.number().optional(),
+    city: z.string().optional(),
+    neighborhood: z.string().optional(),
+    quick_link: z.string().optional(),
+    cuisines: z.array(z.string()).optional(),
+  }).passthrough()).default([]),
+}).passthrough();
+
+const BusinessScoreResponseSchema = z.object({
+  results: z.array(z.object({
+    value: z.number().optional(),
+  }).passthrough()).default([]),
+}).passthrough();
+
+const RatingCountResponseSchema = z.object({
+  count: z.number().optional(),
+}).passthrough();
 
 const BASE_URL =
   "https://backoffice-service-split-t57o3dxfca-nn.a.run.app";
@@ -49,7 +98,7 @@ export function createBeliClient(config: BeliClientConfig) {
       throw new Error(`Beli login failed: ${text}`);
     }
 
-    const data = await res.json();
+    const data = LoginResponseSchema.parse(await res.json());
     accessToken = data.access;
     refreshToken = data.refresh;
     return { access: accessToken, refresh: refreshToken };
@@ -68,7 +117,7 @@ export function createBeliClient(config: BeliClientConfig) {
       return accessToken;
     }
 
-    const data = await res.json();
+    const data = RefreshResponseSchema.parse(await res.json());
     accessToken = data.access;
     return accessToken;
   }
@@ -149,19 +198,13 @@ export function createBeliClient(config: BeliClientConfig) {
       throw new Error(`Beli search error: ${text}`);
     }
 
-    const data = await res.json();
-    const predictions = data.predictions || [];
+    const data = SearchResponseSchema.parse(await res.json());
 
-    return predictions.map(
-      (p: Record<string, unknown>) => ({
+    return data.predictions.map((p) => ({
         externalId: String(p.business || p.place_id),
         provider: "beli" as const,
-        name:
-          (p.structured_formatting as Record<string, unknown>)?.main_text as string ||
-          "",
-        summary:
-          (p.structured_formatting as Record<string, unknown>)?.secondary_text as string ||
-          null,
+        name: p.structured_formatting?.main_text || "",
+        summary: p.structured_formatting?.secondary_text || null,
         rating: null,
         ratingScale: "0-10",
         priceLevel: null,
@@ -174,7 +217,9 @@ export function createBeliClient(config: BeliClientConfig) {
     );
   }
 
-  async function getBusinessDetails(businessId: number): Promise<Record<string, unknown> | null> {
+  type BusinessDetails = z.infer<typeof BusinessDetailsResponseSchema>["results"][number];
+
+  async function getBusinessDetails(businessId: number): Promise<BusinessDetails | null> {
     const params = new URLSearchParams({
       id: String(businessId),
       from_business_page: "true",
@@ -188,8 +233,8 @@ export function createBeliClient(config: BeliClientConfig) {
       throw new Error(`Beli business details error: ${text}`);
     }
 
-    const data = await res.json();
-    return data.results?.[0] ?? null;
+    const data = BusinessDetailsResponseSchema.parse(await res.json());
+    return data.results[0] ?? null;
   }
 
   async function getBusinessScore(businessId: number): Promise<number | null> {
@@ -203,8 +248,8 @@ export function createBeliClient(config: BeliClientConfig) {
 
     if (!res.ok) return null;
 
-    const data = await res.json();
-    return data.results?.[0]?.value ?? null;
+    const data = BusinessScoreResponseSchema.parse(await res.json());
+    return data.results[0]?.value ?? null;
   }
 
   async function getRatingCount(businessId: number): Promise<number | null> {
@@ -214,7 +259,7 @@ export function createBeliClient(config: BeliClientConfig) {
 
     if (!res.ok) return null;
 
-    const data = await res.json();
+    const data = RatingCountResponseSchema.parse(await res.json());
     return data.count ?? null;
   }
 
@@ -230,23 +275,21 @@ export function createBeliClient(config: BeliClientConfig) {
       throw new Error(`No Beli business found for ID: ${businessId}`);
     }
 
-    const cuisines = (details.cuisines as string[]) || [];
-
     return {
       externalId: String(details.id),
       provider: "beli",
-      name: (details.name as string) || "",
+      name: details.name || "",
       summary: null,
       rating: score,
       ratingScale: "0-10",
-      priceLevel: (details.price as number) ?? null,
-      cuisines,
-      lat: (details.lat as number) ?? null,
-      lng: (details.lng as number) ?? null,
-      neighborhood: (details.neighborhood as string) || null,
-      url: (details.quick_link as string) || null,
+      priceLevel: details.price ?? null,
+      cuisines: details.cuisines || [],
+      lat: details.lat ?? null,
+      lng: details.lng ?? null,
+      neighborhood: details.neighborhood || null,
+      url: details.quick_link || null,
       address: null,
-      city: (details.city as string) || null,
+      city: details.city || null,
       state: null,
       reviewer: null,
       isCriticsPick: false,

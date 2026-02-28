@@ -80,6 +80,9 @@ vi.mock("../../utils/clients", () => ({
 
 import { auditBeliTask } from "../../trigger/audit-beli";
 
+// The mock returns the raw options object (which has .run), so we cast to any
+const task = auditBeliTask as any;
+
 describe("audit-beli task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,7 +92,7 @@ describe("audit-beli task", () => {
   it("exits early when no audits are due", async () => {
     mockSelectFrom.mockResolvedValueOnce([]);
 
-    await auditBeliTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeBeli).not.toHaveBeenCalled();
   });
@@ -114,7 +117,7 @@ describe("audit-beli task", () => {
       placeData: null,
     });
 
-    await auditBeliTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeBeli).toHaveBeenCalledWith(
       expect.objectContaining({ id: 10, name: "Place A", cityName: "New York" }),
@@ -131,7 +134,7 @@ describe("audit-beli task", () => {
     ]);
     mockSelectFromWhere.mockResolvedValueOnce([]);
 
-    await auditBeliTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeBeli).not.toHaveBeenCalled();
   });
@@ -145,7 +148,7 @@ describe("audit-beli task", () => {
 
     mockScrapeBeli.mockRejectedValue(new Error("proxy error"));
 
-    await auditBeliTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockMarkAuditFailed).toHaveBeenCalledWith(10, "beli", "proxy error");
   });

@@ -206,6 +206,10 @@ export default function PlaceDetail({
   const [resLastDate, setResLastDate] = useState(place.lastAvailableDate || "");
   const [resNotes, setResNotes] = useState(place.reservationNotes || "");
 
+  // Detect reservation
+  const [detectingReservation, setDetectingReservation] = useState(false);
+  const [detectReservationStatus, setDetectReservationStatus] = useState<"idle" | "triggered" | "error">("idle");
+
   // Manual rating entry
   const [addingRating, setAddingRating] = useState(false);
   const [ratingSource, setRatingSource] = useState("");
@@ -665,6 +669,38 @@ export default function PlaceDetail({
                   </>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  setDetectingReservation(true);
+                  try {
+                    const res = await fetch("/api/places/detect-reservation", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ placeId: place.id }),
+                    });
+                    if (res.ok) {
+                      setDetectReservationStatus("triggered");
+                    } else {
+                      setDetectReservationStatus("error");
+                    }
+                  } catch {
+                    setDetectReservationStatus("error");
+                  } finally {
+                    setDetectingReservation(false);
+                  }
+                }}
+                disabled={detectingReservation}
+                className="mt-3 w-full rounded-md border border-[#d4c9bb] bg-white px-3 py-2 text-xs font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)] disabled:opacity-50"
+              >
+                {detectingReservation
+                  ? "Triggering..."
+                  : detectReservationStatus === "triggered"
+                    ? "Detection triggered ✓"
+                    : detectReservationStatus === "error"
+                      ? "Failed — try again"
+                      : "Detect reservations"}
+              </button>
             </div>
           </div>
         ) : (
@@ -710,7 +746,7 @@ export default function PlaceDetail({
               <div className="mt-1.5">
 
                 {!addingRating ? (
-                  <button
+                  editing && <button
                     onClick={() => setAddingRating(true)}
                     className="mt-1 text-xs font-medium text-[var(--color-amber)] hover:text-[var(--color-amber-light)]"
                   >
@@ -824,11 +860,6 @@ export default function PlaceDetail({
                         });
                       })()}{" "}
                       at {place.openingTime}
-                    </p>
-                  )}
-                  {place.reservationNotes && (
-                    <p className="text-xs italic text-[var(--color-ink-light)]">
-                      {place.reservationNotes}
                     </p>
                   )}
                   {place.reservationUrl && (

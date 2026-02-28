@@ -1,4 +1,27 @@
+import { z } from "zod";
 import { createFetch } from "../proxy";
+
+// ── Zod Schemas ──────────────────────────────────────────────────
+
+const SevenRoomsTimeSchema = z.object({
+  time: z.string(),
+  time_iso: z.string(),
+  type: z.string(),
+  duration: z.number().nullable().optional(),
+}).passthrough();
+
+const SevenRoomsShiftSchema = z.object({
+  is_closed: z.boolean().optional(),
+  shift_category: z.string().optional(),
+  name: z.string().optional(),
+  times: z.array(SevenRoomsTimeSchema).default([]),
+}).passthrough();
+
+const SevenRoomsRangeResponseSchema = z.object({
+  data: z.object({
+    availability: z.record(z.string(), z.array(SevenRoomsShiftSchema).default([])).default({}),
+  }).passthrough(),
+}).passthrough();
 
 const BASE_URL = "https://www.sevenrooms.com/api-yoa/availability/widget/range";
 
@@ -179,19 +202,19 @@ export function createSevenRoomsClient(
       );
     }
 
-    const json = await res.json();
-    const availability = json?.data?.availability ?? {};
+    const json = SevenRoomsRangeResponseSchema.parse(await res.json());
+    const availability = json.data.availability;
 
     const results: SevenRoomsAvailability[] = [];
 
     for (const dateKey of Object.keys(availability).sort()) {
-      const shifts: any[] = availability[dateKey] ?? [];
+      const shifts = availability[dateKey];
       const slots: SevenRoomsSlot[] = [];
 
       for (const shift of shifts) {
         if (shift.is_closed) continue;
 
-        for (const t of shift.times ?? []) {
+        for (const t of shift.times) {
           slots.push({
             time: t.time,
             timeIso: t.time_iso,

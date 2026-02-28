@@ -13,28 +13,25 @@ export type { NytClient, NytClientConfig } from "./nyt/index";
 export { createResyClient } from "./resy/index";
 export type { ResyClient, ResyClientConfig, ResySearchResult, ResyVenue, ResyCalendar, ResyCalendarDay, ResySlot } from "./resy/index";
 
-export { createOpenTableClient } from "./opentable/index.js";
+export { createOpenTableClient } from "./opentable/index";
 export type {
   OpenTableClient,
   OpenTableClientConfig,
   OpenTableAvailability,
   OpenTableSlot,
   OpenTableOpeningWindow,
-} from "./opentable/index.js";
+} from "./opentable/index";
 
-export { createSevenRoomsClient } from "./sevenrooms/index.js";
+export { createSevenRoomsClient } from "./sevenrooms/index";
 export type {
   SevenRoomsClient,
   SevenRoomsClientConfig,
   SevenRoomsAvailability,
   SevenRoomsSlot,
   SevenRoomsOpeningWindow,
-} from "./sevenrooms/index.js";
+} from "./sevenrooms/index";
 
 export { createFetch } from "./proxy";
 export type { ProxyConfig } from "./proxy";
-
-export { scanWebsiteForReservation } from "./website-scanner/index.js";
-export type { WebsiteScanResult, WebsiteScanOptions } from "./website-scanner/index.js";
 
 export type { SearchResult, LookupResult } from "./types";

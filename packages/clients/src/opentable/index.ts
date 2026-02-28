@@ -1,4 +1,24 @@
+import { z } from "zod";
 import { createFetch } from "../proxy";
+
+// ── Zod Schemas ──────────────────────────────────────────────────
+
+const OtTimeslotSchema = z.object({
+  dateTime: z.string(),
+  available: z.boolean(),
+  type: z.string().optional(),
+}).passthrough();
+
+const OtAvailabilitySchema = z.object({
+  id: z.string().optional(),
+  maxDaysInAdvance: z.number().optional(),
+  timeslots: z.array(OtTimeslotSchema).default([]),
+  noTimesReasons: z.array(z.string()).default([]),
+}).passthrough();
+
+const OtAvailabilityResponseSchema = z.object({
+  availability: OtAvailabilitySchema.optional(),
+}).passthrough();
 
 const MOBILE_API = "https://mobile-api.opentable.com/api";
 
@@ -94,8 +114,8 @@ export function createOpenTableClient(config: OpenTableClientConfig = {}) {
       );
     }
 
-    const json = await resp.json();
-    const avail = json?.availability;
+    const json = OtAvailabilityResponseSchema.parse(await resp.json());
+    const avail = json.availability;
 
     if (!avail) {
       return {
@@ -108,7 +128,7 @@ export function createOpenTableClient(config: OpenTableClientConfig = {}) {
       };
     }
 
-    const slots: OpenTableSlot[] = (avail.timeslots || []).map((s: any) => ({
+    const slots: OpenTableSlot[] = avail.timeslots.map((s) => ({
       dateTime: s.dateTime,
       available: s.available,
       type: s.type ?? "Standard",
@@ -119,7 +139,7 @@ export function createOpenTableClient(config: OpenTableClientConfig = {}) {
       dateTime,
       maxDaysInAdvance: avail.maxDaysInAdvance ?? 0,
       hasAvailability: slots.some((s) => s.available),
-      noTimesReasons: avail.noTimesReasons || [],
+      noTimesReasons: avail.noTimesReasons,
       slots,
     };
   }

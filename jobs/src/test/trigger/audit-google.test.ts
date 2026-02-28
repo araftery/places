@@ -79,6 +79,9 @@ vi.mock("../../utils/errors", () => ({
 
 import { auditGoogleTask } from "../../trigger/audit-google";
 
+// The mock returns the raw options object (which has .run), so we cast to any
+const task = auditGoogleTask as any;
+
 describe("audit-google task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -88,7 +91,7 @@ describe("audit-google task", () => {
   it("exits early when no audits are due", async () => {
     mockSelectFrom.mockResolvedValueOnce([]);
 
-    await auditGoogleTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeGoogle).not.toHaveBeenCalled();
   });
@@ -107,7 +110,7 @@ describe("audit-google task", () => {
       placeData: { hoursJson: {}, closedPermanently: false },
     });
 
-    await auditGoogleTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeGoogle).toHaveBeenCalledTimes(1);
     expect(mockUpsertRating).toHaveBeenCalledTimes(1);
@@ -120,7 +123,7 @@ describe("audit-google task", () => {
     ]);
     mockSelectFromWhere.mockResolvedValueOnce([]); // place not found
 
-    await auditGoogleTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeGoogle).not.toHaveBeenCalled();
   });
@@ -134,7 +137,7 @@ describe("audit-google task", () => {
     ]);
     mockScrapeGoogle.mockRejectedValue(new Error("rate limited"));
 
-    await auditGoogleTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockMarkAuditFailed).toHaveBeenCalledWith(10, "google", "rate limited");
   });
@@ -155,7 +158,7 @@ describe("audit-google task", () => {
       placeData: null,
     });
 
-    await auditGoogleTask.run({} as any);
+    await task.run({} as any);
 
     expect(mockScrapeGoogle).toHaveBeenCalledTimes(2);
     expect(mockUpsertAudit).toHaveBeenCalledTimes(2);

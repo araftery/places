@@ -1,4 +1,5 @@
-import type { SearchResult, LookupResult } from "../types.js";
+import { z } from "zod";
+import type { SearchResult, LookupResult } from "../types";
 import { createFetch } from "../proxy";
 
 const GRAPHQL_ENDPOINT = "https://samizdat-graphql.nytimes.com/graphql/v2";
@@ -16,43 +17,71 @@ const PRICE_MAP: Record<string, number> = {
   VERY_EXPENSIVE: 4,
 };
 
-interface NytEdge {
-  node: {
-    id: string;
-    url: string;
-    promotionalHeadline: string;
-    firstPublished: string;
-    bylines: Array<{
-      creators: Array<{ displayName: string }>;
-    }>;
-    reviewItems: Array<{ isCriticsPick: boolean }>;
-    promotionalMedia?: {
-      crops: Array<{
-        renditions: Array<{ url: string; width: number; height: number }>;
-      }>;
-    };
-  };
-  reviewItem: {
-    id: string;
-    name: string;
-    rating: number;
-    priceCategory: string | null;
-    cuisines: string[];
-    shortSummary: string;
-    isCriticsPick: boolean;
-    reservationsUrl: string;
-    sourceId: string;
-    contactDetails?: {
-      addresses: Array<{ neighborhood: string }>;
-    };
-    restaurantImage?: {
-      crops: Array<{
-        renditions: Array<{ url: string }>;
-      }>;
-    };
-    firstPublished?: string;
-  };
-}
+// ── Zod Schemas ──────────────────────────────────────────────────
+
+const NytEdgeSchema = z.object({
+  node: z.object({
+    id: z.string(),
+    url: z.string(),
+    promotionalHeadline: z.string().optional(),
+    firstPublished: z.string().optional(),
+    bylines: z.array(z.object({
+      creators: z.array(z.object({
+        displayName: z.string(),
+      }).passthrough()).default([]),
+    }).passthrough()).default([]),
+    reviewItems: z.array(z.object({
+      isCriticsPick: z.boolean(),
+    }).passthrough()).default([]),
+    promotionalMedia: z.object({
+      crops: z.array(z.object({
+        renditions: z.array(z.object({
+          url: z.string(),
+          width: z.number(),
+          height: z.number(),
+        }).passthrough()).default([]),
+      }).passthrough()).default([]),
+    }).passthrough().optional(),
+  }).passthrough(),
+  reviewItem: z.object({
+    id: z.string(),
+    name: z.string(),
+    rating: z.number(),
+    priceCategory: z.string().nullable().optional(),
+    cuisines: z.array(z.string()).default([]),
+    shortSummary: z.string().optional(),
+    isCriticsPick: z.boolean(),
+    reservationsUrl: z.string().optional(),
+    sourceId: z.string(),
+    contactDetails: z.object({
+      addresses: z.array(z.object({
+        neighborhood: z.string(),
+      }).passthrough()).default([]),
+    }).passthrough().optional(),
+    restaurantImage: z.object({
+      crops: z.array(z.object({
+        renditions: z.array(z.object({
+          url: z.string(),
+        }).passthrough()).default([]),
+      }).passthrough()).default([]),
+    }).passthrough().optional(),
+    firstPublished: z.string().optional(),
+  }).passthrough(),
+}).passthrough();
+
+type NytEdge = z.infer<typeof NytEdgeSchema>;
+
+const NytSearchResponseSchema = z.object({
+  data: z.object({
+    reviews: z.object({
+      dining: z.object({
+        search: z.object({
+          edges: z.array(NytEdgeSchema).default([]),
+        }).passthrough(),
+      }).passthrough(),
+    }).passthrough(),
+  }).passthrough(),
+}).passthrough();
 
 export interface NytClientConfig {
   proxyUrl?: string;
@@ -91,16 +120,15 @@ export function createNytClient(config?: NytClientConfig) {
       throw new Error(`NYT dining search error: ${text}`);
     }
 
-    const data = await res.json();
-    const edges: NytEdge[] =
-      data?.data?.reviews?.dining?.search?.edges ?? [];
+    const data = NytSearchResponseSchema.parse(await res.json());
+    const edges = data.data.reviews.dining.search.edges;
 
     return edges.map((edge) => {
       const { node, reviewItem } = edge;
       const neighborhood =
         reviewItem.contactDetails?.addresses?.[0]?.neighborhood ?? null;
-      const cuisines = (reviewItem.cuisines || []).flatMap((c: string) =>
-        c.split(";").map((s: string) => s.trim())
+      const cuisines = reviewItem.cuisines.flatMap((c) =>
+        c.split(";").map((s) => s.trim())
       );
 
       return {
@@ -152,8 +180,8 @@ export function createNytClient(config?: NytClientConfig) {
       },
     });
 
-    const data = await res.json();
-    const edge: NytEdge = data?.data?.reviews?.dining?.search?.edges?.[0];
+    const data = NytSearchResponseSchema.parse(await res.json());
+    const edge = data.data.reviews.dining.search.edges[0];
 
     if (!edge) {
       throw new Error(`No NYT review found for: ${sourceId}`);
@@ -162,14 +190,14 @@ export function createNytClient(config?: NytClientConfig) {
     const { node, reviewItem } = edge;
     const neighborhood =
       reviewItem.contactDetails?.addresses?.[0]?.neighborhood ?? null;
-    const cuisines = (reviewItem.cuisines || []).flatMap((c: string) =>
-      c.split(";").map((s: string) => s.trim())
+    const cuisines = reviewItem.cuisines.flatMap((c) =>
+      c.split(";").map((s) => s.trim())
     );
     const reviewer =
-      node.bylines?.[0]?.creators?.[0]?.displayName ?? null;
+      node.bylines[0]?.creators[0]?.displayName ?? null;
     const isCriticsPick =
       reviewItem.isCriticsPick ||
-      node.reviewItems?.[0]?.isCriticsPick ||
+      node.reviewItems[0]?.isCriticsPick ||
       false;
 
     return {

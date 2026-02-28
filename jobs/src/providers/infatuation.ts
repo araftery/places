@@ -106,6 +106,10 @@ export async function scrapeInfatuation(
         externalId: slug,
       },
       placeData: null,
+      extra: {
+        reservationPlatform: (details.raw as any)?.venue?.reservation?.reservationPlatform ?? null,
+        reservationUrl: (details.raw as any)?.venue?.reservation?.reservationUrl ?? null,
+      },
     };
   });
 }

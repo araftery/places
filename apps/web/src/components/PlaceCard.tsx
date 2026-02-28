@@ -4,16 +4,8 @@ import { Place } from "@/lib/types";
 import type { TravelTimeBand } from "@/lib/geo";
 
 const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
+const MIN_REVIEWS_TO_SHOW_RATING = 300;
 
-const PROVIDER_SHORT: Record<string, string> = {
-  resy: "Resy",
-  opentable: "OT",
-  sevenrooms: "7R",
-  thefork: "TF",
-  walk_in: "Walk-in",
-  phone: "Phone",
-  other: "Res",
-};
 
 interface PlaceCardProps {
   place: Place;
@@ -72,19 +64,19 @@ export default function PlaceCard({
           {place.placeType && (
             <span className="capitalize">{place.placeType.replace("_", " ")}</span>
           )}
-          {place.placeType && (place.priceRange || googleRating?.rating || travelTime) && (
+          {place.placeType && (place.priceRange || (googleRating?.rating && (googleRating.reviewCount ?? 0) >= MIN_REVIEWS_TO_SHOW_RATING) || travelTime) && (
             <span className="text-[var(--color-sidebar-muted)]/40">&middot;</span>
           )}
           {place.priceRange && (
             <span>{PRICE_LABELS[place.priceRange]}</span>
           )}
-          {place.priceRange && (googleRating?.rating || travelTime) && (
+          {place.priceRange && ((googleRating?.rating && (googleRating.reviewCount ?? 0) >= MIN_REVIEWS_TO_SHOW_RATING) || travelTime) && (
             <span className="text-[var(--color-sidebar-muted)]/40">&middot;</span>
           )}
-          {googleRating?.rating && (
+          {googleRating?.rating && (googleRating.reviewCount ?? 0) >= MIN_REVIEWS_TO_SHOW_RATING && (
             <span className="text-[var(--color-amber)]">★ {googleRating.rating}</span>
           )}
-          {googleRating?.rating && travelTime && (
+          {googleRating?.rating && (googleRating.reviewCount ?? 0) >= MIN_REVIEWS_TO_SHOW_RATING && travelTime && (
             <span className="text-[var(--color-sidebar-muted)]/40">&middot;</span>
           )}
           {travelTime && (
@@ -98,10 +90,10 @@ export default function PlaceCard({
               <span className="font-semibold uppercase text-[var(--color-terracotta)]">Closed</span>
             </>
           )}
-          {!place.closedPermanently && place.reservationProvider && PROVIDER_SHORT[place.reservationProvider] && (
+          {!place.closedPermanently && place.reservationProvider === "walk_in" && (place.placeType === "restaurant" || place.placeType === "cocktail_bar") && (
             <>
               <span className="text-[var(--color-sidebar-muted)]/40">&middot;</span>
-              <span className="text-[var(--color-sidebar-muted)]/70">{PROVIDER_SHORT[place.reservationProvider]}</span>
+              <span className="text-[var(--color-sidebar-muted)]/70">Walk-in</span>
             </>
           )}
         </div>
@@ -170,14 +162,14 @@ export default function PlaceCard({
             {PRICE_LABELS[place.priceRange]}
           </span>
         )}
-        {googleRating?.rating && (
+        {googleRating?.rating && (googleRating.reviewCount ?? 0) >= MIN_REVIEWS_TO_SHOW_RATING && (
           <span className="text-[11px] text-[var(--color-amber)]">
             ★ {googleRating.rating}
           </span>
         )}
-        {place.reservationProvider && PROVIDER_SHORT[place.reservationProvider] && (
+        {place.reservationProvider === "walk_in" && (place.placeType === "restaurant" || place.placeType === "cocktail_bar") && (
           <span className="text-[11px] text-[var(--color-sidebar-muted)]/70">
-            {PROVIDER_SHORT[place.reservationProvider]}
+            Walk-in
           </span>
         )}
         {place.cuisineType && place.cuisineType.length > 0 && (

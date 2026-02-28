@@ -53,9 +53,6 @@ export default function Home() {
     useState<GeoJSON.FeatureCollection | null>(null);
   const [isoLoading, setIsoLoading] = useState(false);
 
-  // Review state: places needing attention (closed or stale)
-  const [reviewClosed, setReviewClosed] = useState<Place[]>([]);
-  const [reviewStale, setReviewStale] = useState<Place[]>([]);
 
   const fetchPlaces = useCallback(async () => {
     const res = await fetch("/api/places");
@@ -86,58 +83,67 @@ export default function Home() {
     setCities(data);
   }, []);
 
-  const fetchReview = useCallback(async () => {
-    try {
-      const res = await fetch("/api/places/needs-review");
-      const data = await res.json();
-      setReviewClosed(data.closed || []);
-      setReviewStale(data.stale || []);
-    } catch {
-      // Silently fail — review banner is non-critical
-    }
-  }, []);
 
   const geolocatedRef = useRef(false);
 
   useEffect(() => {
-    Promise.all([fetchPlaces(), fetchTags(), fetchCities(), fetchReview()]).finally(
+    Promise.all([fetchPlaces(), fetchTags(), fetchCities()]).finally(
       () => setLoading(false)
     );
-  }, [fetchPlaces, fetchTags, fetchCities, fetchReview]);
+  }, [fetchPlaces, fetchTags, fetchCities]);
 
   // On mount, geolocate user and fly map + auto-select closest city
   useEffect(() => {
-    if (geolocatedRef.current || !navigator.geolocation) return;
+    if (geolocatedRef.current) return;
     // Wait for cities to load before geolocating
     if (cities.length === 0) return;
     geolocatedRef.current = true;
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setFlyTo({ lat: latitude, lng: longitude, zoom: 12 });
-
-        // Find closest city
-        let closest: City | null = null;
-        let closestDist = Infinity;
-        for (const city of cities) {
-          const dLat = city.lat - latitude;
-          const dLng = city.lng - longitude;
-          const dist = dLat * dLat + dLng * dLng;
-          if (dist < closestDist) {
-            closestDist = dist;
-            closest = city;
-          }
+    const findClosestCity = (lat: number, lng: number): City | null => {
+      let closest: City | null = null;
+      let closestDist = Infinity;
+      for (const city of cities) {
+        const dLat = city.lat - lat;
+        const dLng = city.lng - lng;
+        const dist = dLat * dLat + dLng * dLng;
+        if (dist < closestDist) {
+          closestDist = dist;
+          closest = city;
         }
-        // Auto-select if within ~50 miles (~0.72 degrees)
-        if (closest && Math.sqrt(closestDist) * 69 <= 50) {
-          setSelectedCityId(closest.id);
-        }
-      },
-      () => {
-        // Geolocation denied or failed — keep default view
       }
-    );
+      return closest;
+    };
+
+    const selectCity = (city: City) => {
+      setSelectedCityId(city.id);
+      setFlyTo({ lat: city.lat, lng: city.lng, zoom: 12 });
+    };
+
+    // Default to New York immediately
+    const ny = cities.find((c) => c.name === "New York");
+    if (ny) selectCity(ny);
+
+    // Then override with closest city if geolocation succeeds
+    const geolocate = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const closest = findClosestCity(pos.coords.latitude, pos.coords.longitude);
+          if (closest) selectCity(closest);
+        },
+        () => {} // Geolocation denied — keep New York
+      );
+    };
+
+    if (navigator.geolocation) {
+      geolocate();
+
+      // Re-run if the user grants permission later
+      navigator.permissions?.query({ name: "geolocation" }).then((status) => {
+        status.addEventListener("change", () => {
+          if (status.state === "granted") geolocate();
+        });
+      });
+    }
   }, [cities]);
 
   // Reset to places tab when city doesn't have discover
@@ -269,33 +275,6 @@ export default function Home() {
     }));
   }
 
-  async function handleReviewArchive(id: number) {
-    await fetch("/api/places", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, archived: true }),
-    });
-    setPlaces((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, archived: true } : p))
-    );
-    setReviewClosed((prev) => prev.filter((p) => p.id !== id));
-    setReviewStale((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  function handleReviewDismissClosed(id: number) {
-    // Clear the closedPermanently flag so it doesn't show up again
-    fetch("/api/places", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, closedPermanently: false }),
-    });
-    setPlaces((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, closedPermanently: false } : p
-      )
-    );
-    setReviewClosed((prev) => prev.filter((p) => p.id !== id));
-  }
 
   function handleSelectDiscoverIndex(index: number | null) {
     setSelectedDiscoverIndex(index);
@@ -418,10 +397,6 @@ export default function Home() {
           onFiltersChange={setFilters}
           onManageTags={() => setShowManageTags(true)}
           travelTimes={travelTimes}
-          reviewClosed={reviewClosed}
-          reviewStale={reviewStale}
-          onReviewArchive={handleReviewArchive}
-          onReviewDismissClosed={handleReviewDismissClosed}
           selectedCityId={selectedCityId}
           onCityChange={handleCityChange}
           isochroneActive={!!isoGeoJson}
@@ -523,10 +498,6 @@ export default function Home() {
           onFiltersChange={setFilters}
           onManageTags={() => setShowManageTags(true)}
           travelTimes={travelTimes}
-          reviewClosed={reviewClosed}
-          reviewStale={reviewStale}
-          onReviewArchive={handleReviewArchive}
-          onReviewDismissClosed={handleReviewDismissClosed}
           selectedCityId={selectedCityId}
           onCityChange={handleCityChange}
           isochroneActive={!!isoGeoJson}

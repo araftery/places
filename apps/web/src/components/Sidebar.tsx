@@ -2,7 +2,7 @@
 
 import { Place, Tag, City, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
-import ReviewBanner from "./ReviewBanner";
+
 import DiscoverPanel from "./DiscoverPanel";
 import type { DiscoverPin } from "./DiscoverPanel";
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -21,10 +21,6 @@ interface SidebarProps {
   onFiltersChange: (filters: Filters) => void;
   onManageTags: () => void;
   travelTimes?: Map<number, TravelTimeBand>;
-  reviewClosed?: Place[];
-  reviewStale?: Place[];
-  onReviewArchive?: (id: number) => void;
-  onReviewDismissClosed?: (id: number) => void;
   selectedCityId: number | null;
   onCityChange: (cityId: number | null) => void;
   isochroneActive?: boolean;
@@ -222,10 +218,6 @@ export default function Sidebar({
   onFiltersChange,
   onManageTags,
   travelTimes,
-  reviewClosed = [],
-  reviewStale = [],
-  onReviewArchive,
-  onReviewDismissClosed,
   selectedCityId,
   onCityChange,
   isochroneActive,
@@ -694,17 +686,6 @@ export default function Sidebar({
             Clear all filters
           </button>
         </div>
-      )}
-
-      {/* Review Banner */}
-      {activeTab === "places" && onReviewArchive && onReviewDismissClosed && (
-        <ReviewBanner
-          closedPlaces={reviewClosed}
-          stalePlaces={reviewStale}
-          onArchive={onReviewArchive}
-          onDismissClosed={onReviewDismissClosed}
-          onSelectPlace={onSelectPlace}
-        />
       )}
 
       {/* Place List */}

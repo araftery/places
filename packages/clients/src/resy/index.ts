@@ -1,4 +1,76 @@
+import { z } from "zod";
 import { createFetch } from "../proxy";
+
+// ── Zod Schemas ──────────────────────────────────────────────────
+
+const ResySearchHitSchema = z.object({
+  id: z.object({ resy: z.number() }).passthrough().optional(),
+  name: z.string(),
+  url_slug: z.string(),
+  region: z.union([z.object({ id: z.string() }).passthrough(), z.string()]).optional(),
+  location: z.object({
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+  }).passthrough().optional(),
+}).passthrough();
+
+const ResySearchResponseSchema = z.object({
+  search: z.object({
+    hits: z.array(ResySearchHitSchema).default([]),
+  }).passthrough(),
+}).passthrough();
+
+const ResyContentItemSchema = z.object({
+  body: z.string().nullable().optional(),
+}).passthrough();
+
+const ResyVenueResponseSchema = z.object({
+  id: z.object({ resy: z.number() }).passthrough().optional(),
+  name: z.string(),
+  url_slug: z.string(),
+  location: z.object({
+    region: z.string().optional(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+  }).passthrough().optional(),
+  contact: z.object({
+    url: z.string().optional(),
+  }).passthrough().optional(),
+  content: z.array(ResyContentItemSchema).default([]),
+}).passthrough();
+
+const ResyCalendarDaySchema = z.object({
+  date: z.string(),
+  inventory: z.object({
+    reservation: z.string().optional(),
+  }).passthrough().optional(),
+}).passthrough();
+
+const ResyCalendarResponseSchema = z.object({
+  last_calendar_day: z.string(),
+  scheduled: z.array(ResyCalendarDaySchema).default([]),
+}).passthrough();
+
+const ResySlotSchema = z.object({
+  config: z.object({
+    id: z.string().optional(),
+    type: z.string().optional(),
+  }).passthrough().optional(),
+  date: z.object({
+    start: z.string().optional(),
+    end: z.string().optional(),
+  }).passthrough().optional(),
+}).passthrough();
+
+const ResyFindVenueSchema = z.object({
+  slots: z.array(ResySlotSchema).default([]),
+}).passthrough();
+
+const ResyFindResponseSchema = z.object({
+  results: z.object({
+    venues: z.array(ResyFindVenueSchema).default([]),
+  }).passthrough(),
+}).passthrough();
 
 const BASE_URL = "https://api.resy.com";
 
@@ -66,6 +138,8 @@ export function createResyClient(config: ResyClientConfig) {
       body.geo = { latitude: options.lat, longitude: options.lng };
     }
 
+    console.log(`[resy-client] search request:`, JSON.stringify(body));
+
     const res = await fetchFn(`${BASE_URL}/3/venuesearch/search`, {
       method: "POST",
       headers: { ...defaultHeaders, "Content-Type": "application/json" },
@@ -74,24 +148,30 @@ export function createResyClient(config: ResyClientConfig) {
 
     if (!res.ok) {
       const text = await res.text();
+      console.error(`[resy-client] search error: ${res.status} ${text}`);
       throw new Error(`Resy search error: ${text}`);
     }
 
-    const data = await res.json();
-    const hits = data?.search?.hits ?? [];
+    const raw = await res.json();
+    console.log(`[resy-client] search raw response hits:`, JSON.stringify(raw.search?.hits?.length ?? 0));
+    const data = ResySearchResponseSchema.parse(raw);
 
-    return hits.map((hit: any) => ({
-      venueId: hit.id?.resy,
+    const results = data.search.hits.map((hit) => ({
+      venueId: hit.id?.resy!,
       name: hit.name,
       urlSlug: hit.url_slug,
-      regionId: hit.region?.id ?? "",
+      regionId: typeof hit.region === "string" ? hit.region : hit.region?.id ?? "",
       lat: hit.location?.latitude ?? null,
       lng: hit.location?.longitude ?? null,
     }));
+
+    console.log(`[resy-client] search results:`, JSON.stringify(results.map((r) => ({ name: r.name, venueId: r.venueId, slug: r.urlSlug, regionId: r.regionId }))));
+    return results;
   }
 
   async function getVenue(venueId: number): Promise<ResyVenue> {
     const params = new URLSearchParams({ id: String(venueId) });
+    console.log(`[resy-client] getVenue request: venueId=${venueId}`);
 
     const res = await fetchFn(`${BASE_URL}/3/venue?${params}`, {
       headers: defaultHeaders,
@@ -99,17 +179,21 @@ export function createResyClient(config: ResyClientConfig) {
 
     if (!res.ok) {
       const text = await res.text();
+      console.error(`[resy-client] getVenue error: ${res.status} ${text}`);
       throw new Error(`Resy venue error: ${text}`);
     }
 
-    const data = await res.json();
+    const raw = await res.json();
+    const data = ResyVenueResponseSchema.parse(raw);
 
-    const contentBodies: string[] = (data.content ?? [])
-      .map((c: any) => c.body)
-      .filter((b: any): b is string => typeof b === "string" && b.length > 0);
+    const contentBodies: string[] = data.content
+      .map((c) => c.body)
+      .filter((b): b is string => typeof b === "string" && b.length > 0);
+
+    console.log(`[resy-client] getVenue response: name=${data.name}, slug=${data.url_slug}, contentItems=${contentBodies.length}`);
 
     return {
-      venueId: data.id?.resy,
+      venueId: data.id?.resy!,
       name: data.name,
       urlSlug: data.url_slug,
       regionId: data.location?.region ?? "",
@@ -134,21 +218,27 @@ export function createResyClient(config: ResyClientConfig) {
       end_date: endDate,
     });
 
+    console.log(`[resy-client] getCalendar request: venueId=${venueId}, seats=${numSeats}, start=${startDate}, end=${endDate}`);
+
     const res = await fetchFn(`${BASE_URL}/4/venue/calendar?${params}`, {
       headers: defaultHeaders,
     });
 
     if (!res.ok) {
       const text = await res.text();
+      console.error(`[resy-client] getCalendar error: ${res.status} ${text}`);
       throw new Error(`Resy calendar error: ${text}`);
     }
 
-    const data = await res.json();
+    const raw = await res.json();
+    const data = ResyCalendarResponseSchema.parse(raw);
 
-    const days: ResyCalendarDay[] = (data.scheduled ?? []).map((day: any) => ({
+    const days: ResyCalendarDay[] = data.scheduled.map((day) => ({
       date: day.date,
-      status: day.inventory?.reservation ?? "closed",
+      status: (day.inventory?.reservation ?? "closed") as ResyCalendarDay["status"],
     }));
+
+    console.log(`[resy-client] getCalendar response: lastCalendarDay=${data.last_calendar_day}, scheduledDays=${days.length}, availableDays=${days.filter((d) => d.status === "available").length}`);
 
     return {
       lastCalendarDay: data.last_calendar_day,
@@ -181,11 +271,11 @@ export function createResyClient(config: ResyClientConfig) {
       throw new Error(`Resy find availability error: ${text}`);
     }
 
-    const data = await res.json();
-    const venues = data?.results?.venues ?? [];
+    const data = ResyFindResponseSchema.parse(await res.json());
+    const venues = data.results.venues;
     if (venues.length === 0) return [];
 
-    return (venues[0].slots ?? []).map((slot: any) => ({
+    return venues[0].slots.map((slot) => ({
       configId: slot.config?.id ?? "",
       type: slot.config?.type ?? "",
       startTime: slot.date?.start ?? "",

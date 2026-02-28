@@ -1,5 +1,23 @@
-import type { SearchResult, LookupResult } from "../types.js";
+import { z } from "zod";
+import type { SearchResult, LookupResult } from "../types";
 import { createFetch } from "../proxy";
+
+// ── Zod Schemas ──────────────────────────────────────────────────
+
+const AutocompleteSuggestionSchema = z.object({
+  placePrediction: z.object({
+    placeId: z.string(),
+    text: z.object({ text: z.string() }).passthrough(),
+    structuredFormat: z.object({
+      mainText: z.object({ text: z.string() }).passthrough(),
+      secondaryText: z.object({ text: z.string() }).passthrough(),
+    }).passthrough(),
+  }).passthrough(),
+}).passthrough();
+
+const AutocompleteResponseSchema = z.object({
+  suggestions: z.array(AutocompleteSuggestionSchema).default([]),
+}).passthrough();
 
 const BASE_URL = "https://places.googleapis.com/v1/places";
 
@@ -116,8 +134,8 @@ export function createGoogleClient(config: GoogleClientConfig) {
       throw new Error(`Google Places autocomplete error: ${text}`);
     }
 
-    const data = await res.json();
-    return data.suggestions || [];
+    const data = AutocompleteResponseSchema.parse(await res.json());
+    return data.suggestions;
   }
 
   async function getPlaceDetails(
@@ -152,7 +170,7 @@ export function createGoogleClient(config: GoogleClientConfig) {
       throw new Error(`Google Places details error: ${text}`);
     }
 
-    return res.json();
+    return res.json() as Promise<GooglePlaceResult>;
   }
 
   async function search(

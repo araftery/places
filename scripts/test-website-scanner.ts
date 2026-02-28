@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { scanWebsiteForReservation } from "@places/clients";
+import { scanWebsiteForReservation } from "./jobs/src/utils/website-scanner";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

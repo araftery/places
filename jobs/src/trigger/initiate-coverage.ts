@@ -1,4 +1,4 @@
-import { task, logger } from "@trigger.dev/sdk";
+import { task, logger, tasks } from "@trigger.dev/sdk";
 import { db } from "@places/db";
 import { places, cities } from "@places/db/schema";
 import { eq } from "drizzle-orm";
@@ -89,6 +89,7 @@ export const initiateCoverageTask = task({
     const sessionId = generateSessionId();
     const scrapers = getScrapers(sessionId);
     const results: Record<string, { found: boolean; error?: string }> = {};
+    let infatuationExtra: Record<string, unknown> | undefined;
 
     for (const provider of providers) {
       const scraper = scrapers[provider];
@@ -143,6 +144,10 @@ export const initiateCoverageTask = task({
 
         await upsertAudit(place.id, provider, result, AUDIT_DAYS[provider] ?? 30);
         results[provider] = { found: result.found };
+
+        if (provider === "infatuation" && result.extra) {
+          infatuationExtra = result.extra;
+        }
       } catch (err) {
         const { fullMessage, type, stack, cause } = extractError(err);
         logger.error("Provider scrape failed", {
@@ -157,6 +162,25 @@ export const initiateCoverageTask = task({
         await markAuditFailed(place.id, provider, fullMessage);
         results[provider] = { found: false, error: fullMessage };
       }
+    }
+
+    // Fire-and-forget reservation detection
+    try {
+      await tasks.trigger("detect-reservation", {
+        placeId: place.id,
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        websiteUrl: place.websiteUrl,
+        infatuationReservationPlatform: (infatuationExtra?.reservationPlatform as string) ?? null,
+        infatuationReservationUrl: (infatuationExtra?.reservationUrl as string) ?? null,
+      });
+      logger.info("Triggered reservation detection", { placeId: place.id });
+    } catch (err) {
+      logger.error("Failed to trigger reservation detection", {
+        placeId: place.id,
+        error: extractError(err).fullMessage,
+      });
     }
 
     const succeeded = Object.values(results).filter((r) => !r.error).length;
