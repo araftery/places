@@ -3,6 +3,7 @@ import {
   createInfatuationClient,
   createBeliClient,
   createNytClient,
+  createResyClient,
 } from "@places/clients";
 
 function getProxyUrl(sessionId: string): string | undefined {
@@ -42,6 +43,13 @@ export function getBeliClient(sessionId: string) {
 
 export function getNytClient(sessionId: string) {
   return createNytClient({
+    proxyUrl: getProxyUrl(sessionId),
+  });
+}
+
+export function getResyClient(sessionId: string) {
+  return createResyClient({
+    apiKey: process.env.RESY_API_KEY!,
     proxyUrl: getProxyUrl(sessionId),
   });
 }

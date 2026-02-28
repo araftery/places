@@ -9,6 +9,7 @@
     "./infatuation": "./src/infatuation/index.ts",
     "./beli": "./src/beli/index.ts",
     "./nyt": "./src/nyt/index.ts",
+    "./resy": "./src/resy/index.ts",
     "./proxy": "./src/proxy.ts"
   },
   "scripts": {

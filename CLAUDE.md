@@ -4,6 +4,10 @@ Personal web app for tracking recommended and favorite places (restaurants, bars
 
 ./KEY_USE_CASES.md lists the key use cases of the app
 
+## Rules
+
+- Always use `pnpm` (never `npm` or `npx`) for running scripts, installing packages, and executing tools (e.g. `pnpm tsx` not `npx tsx`)
+
 ## Monorepo Structure
 
 pnpm workspace monorepo:
