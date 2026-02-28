@@ -8,31 +8,152 @@ Create an OpenTable client at `packages/clients/src/opentable/index.ts` that can
 
 This is part of a larger reservation provider detection system. The OpenTable client will be used by the detection orchestrator after the website scanner finds an OpenTable `rid` on the restaurant's website (via widget embed or link).
 
-OpenTable does NOT have a public or undocumented API like Resy. The approach is:
-1. **Manual research step (MUST DO FIRST):** Open the OT widget in a browser, inspect network requests to find the internal availability API endpoint
-2. **Implement the client** calling that endpoint directly
+OpenTable does NOT have a public API. Research revealed two internal APIs:
+1. **Web GraphQL API** (`/dapi/fe/gql`) — blocked by Akamai Bot Manager, requires JS execution
+2. **Mobile REST API** (`mobile-api.opentable.com`) — discovered via iOS mitmproxy, works with a static Bearer token, no cookies/sessions needed ← **this is what the client uses**
 
-## Pre-Implementation Research
+## Research Findings (Completed 2026-02-27)
 
-Before writing any code, you must reverse-engineer the OT widget's availability API:
+### Availability API
 
-1. Open Chrome and navigate to: `https://www.opentable.com/widget/reservation/preview/canvas?rid=1180&domain=com&type=standard&theme=standard&lang=en-US&overlay=false&iframe=true`
-   (rid=1180 is Gramercy Tavern, a well-known OT restaurant)
+- **Endpoint**: `POST https://www.opentable.com/dapi/fe/gql?optype=query&opname=RestaurantsAvailability`
+- **Type**: GraphQL with **persisted queries** (no inline query text, uses `extensions.persistedQuery.sha256Hash`)
+- **Hash**: `b2d05a06151b3cb21d9dfce4f021303eeba288fac347068b29c1cb66badc46af`
 
-2. Open Chrome DevTools → Network tab → filter to XHR/Fetch requests
+**Variables**:
+- `restaurantIds`: number[] (internal ID, NOT the `rid` from widget URLs)
+- `date`: "YYYY-MM-DD"
+- `time`: "HH:mm" (24h)
+- `partySize`: number
+- `forwardDays`: 0
+- `onlyPop`: false
+- `requireTimes`: false
+- `requireTypes`: "Standard"
+- `privilegedAccess`: ""
+- `databaseRegion`: "NA"
+- `restaurantAvailabilityTokens`: []
 
-3. On the widget, change the date (use the date picker to select dates further and further out). Watch for network requests that fetch availability data.
+**Required Headers**:
+- `x-csrf-token`: UUID (from `window.__CSRF_TOKEN__` / `windowVariables` JSON in page HTML)
+- `ot-page-type`: "restprofilepage"
+- `ot-page-group`: "rest-profile"
+- `Content-Type`: "application/json"
+- Session cookies from page load
 
-4. Record:
-   - The full URL of the availability request
-   - Query parameters (rid, date format, party size, etc.)
-   - Response JSON structure (what does available vs unavailable look like?)
-   - Any required headers (cookies, tokens, CORS)
-   - What happens when you pick a date far in the future (90+ days) — does it return empty? An error?
+**Response Structure**:
+```json
+{
+  "data": {
+    "availability": [{
+      "restaurantId": 942,
+      "availabilityDays": [{
+        "noTimesReasons": ["BlockedAvailability"],  // or ["NoTimesExist"] or []
+        "slots": [{
+          "isAvailable": true,
+          "timeOffsetMinutes": -30,  // relative to requested time
+          "slotHash": "3677215611",
+          "type": "Standard"
+        }]
+      }]
+    }]
+  }
+}
+```
 
-5. Try the same with a few different `rid` values to confirm the pattern is consistent.
+**noTimesReasons values**:
+- `[]` — has availability (check slots)
+- `["BlockedAvailability"]` — reservations exist but all taken (sold out)
+- `["NoTimesExist"]` — no online availability on that day
 
-**If the widget API requires authentication tokens or cookies that are generated client-side**, we may need to fall back to: fetching the widget HTML page, extracting tokens from it, then calling the API. Document what you find.
+### Restaurant Page Data
+
+The restaurant page at `https://www.opentable.com/r/{slug}` contains embedded JSON with:
+- `__CSRF_TOKEN__`: UUID in a `<script type="application/json">` windowVariables block
+- `__INITIAL_STATE__.restaurantProfile.restaurant`:
+  - `restaurantId`: internal numeric ID (e.g., 942 for Gramercy Tavern)
+  - `name`: restaurant name
+  - `maxAdvanceDays`: how far ahead reservations can be made (e.g., 28)
+  - `timeZone.offsetInMinutes`: timezone offset (e.g., -300 for EST)
+
+### URL Parameters
+
+The restaurant page accepts query params to preset the search:
+- `?dateTime=2026-03-05T19%3A00&covers=2` → sets `initialDTPDate`, `initialDTPTime`, `initialDTPPartySize`
+- Availability is NOT server-rendered — always fetched client-side via GraphQL
+
+### Opening Window
+
+- `maxAdvanceDays` on the restaurant object directly tells us the booking window
+- The calendar UI greys out dates beyond `today + maxAdvanceDays`
+- No probing/binary search needed — just read `maxAdvanceDays` from the page
+
+### Bot Protection (Akamai)
+
+The GraphQL API is behind Akamai Bot Manager. Direct server-to-server calls return 400 because:
+- The `_abck` cookie requires JavaScript sensor data execution to become valid
+- Without valid Akamai cookies, the gateway rejects POST requests to `/dapi/fe/gql`
+- **Page HTML fetching works fine** with browser-like headers (200 OK, ~46KB)
+- The Oxylabs residential proxy may help bypass Akamai for the GraphQL calls
+
+### Mobile REST API (via iOS mitmproxy — USED BY CLIENT)
+
+Discovered by intercepting OpenTable iOS app traffic with mitmproxy.
+
+- **Base URL**: `https://mobile-api.opentable.com/api`
+- **Auth**: Static Bearer token `41dbbf15-5c4e-415b-9f45-5c1209878e42` (app-level, not user-specific)
+- **No cookies, no CSRF, no Akamai** — works directly from curl/fetch
+
+**Availability endpoint**: `PUT /v3/restaurant/availability`
+
+Request body:
+```json
+{
+  "rids": ["1339957"],
+  "dateTime": "2026-03-10T19:00",
+  "partySize": 2,
+  "forceNextAvailable": "true",
+  "includeNextAvailable": false,
+  "includePrivateDining": false,
+  "requestAttributeTables": "true",
+  "requestDateMessages": true,
+  "allowPop": true,
+  "attribution": { "partnerId": "84" }
+}
+```
+
+Response:
+```json
+{
+  "availability": {
+    "id": "1339957",
+    "dateTime": "2026-03-10T19:00",
+    "maxDaysInAdvance": 60,
+    "noTimesReasons": [],
+    "timeslots": [
+      { "dateTime": "2026-03-10T15:30", "available": true, "type": "Standard", "slotHash": "..." },
+      ...
+    ]
+  }
+}
+```
+
+**noTimesReasons values**:
+- `[]` — has availability
+- `["BlockedAvailability"]` — sold out
+- `["NoTimesExist"]` — no online availability that day
+- `["TooFarInAdvance"]` — date is beyond `maxDaysInAdvance`
+
+**Key advantages over web GraphQL API**:
+- No Akamai Bot Manager — works from plain `fetch`
+- Uses the same `rid` as widget URLs (the mobile API uses `rids`, not internal `restaurantId`)
+- `maxDaysInAdvance` returned in every availability response
+- Timeslots use absolute ISO datetimes (not offset-based)
+
+### ID Mapping
+
+- The web UI uses an internal `restaurantId` (e.g., 942) which differs from the widget `rid` (1180)
+- The **mobile API uses `rid`** directly — same as what appears in widget embed URLs
+- For the detection system, the website scanner extracts `rid` from widgets → passes directly to the mobile API client
 
 ## Client Pattern
 

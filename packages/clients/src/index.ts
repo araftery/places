@@ -10,6 +10,15 @@ export type { BeliClient, BeliClientConfig, BeliTokens } from "./beli/index.js";
 export { createNytClient } from "./nyt/index.js";
 export type { NytClient, NytClientConfig } from "./nyt/index.js";
 
+export { createOpenTableClient } from "./opentable/index.js";
+export type {
+  OpenTableClient,
+  OpenTableClientConfig,
+  OpenTableAvailability,
+  OpenTableSlot,
+  OpenTableOpeningWindow,
+} from "./opentable/index.js";
+
 export { createFetch } from "./proxy";
 export type { ProxyConfig } from "./proxy";
 
