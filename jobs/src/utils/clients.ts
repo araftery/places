@@ -8,7 +8,7 @@ import {
   createSevenRoomsClient,
 } from "@places/clients";
 
-function getProxyUrl(sessionId: string): string | undefined {
+export function getProxyUrl(sessionId: string): string | undefined {
   const user = process.env.OXYLABS_USERNAME;
   const pass = process.env.OXYLABS_PASSWORD;
   if (!user || !pass) return undefined;

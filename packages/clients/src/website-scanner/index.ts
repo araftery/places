@@ -12,6 +12,8 @@ export interface WebsiteScanResult {
   openingWindowDays: number | null;
   /** Opening pattern (from text signals) */
   openingPattern: string | null; // "rolling" | "bulk" | null
+  /** Time of day reservations open, in local time (e.g. "10:00 AM", "midnight", "noon") */
+  openingTime: string | null;
   /** All signals found during scanning (for debugging) */
   signals: string[];
 }
@@ -129,13 +131,19 @@ const scanResultSchema = {
       description:
         'How reservations are released. "rolling" if they open on a rolling basis (e.g. 14 days in advance). "bulk" if they are released on a specific date (e.g. first of the month). null if not mentioned.',
     },
+    openingTime: {
+      type: SchemaType.STRING as const,
+      nullable: true as const,
+      description:
+        'The time of day (in the restaurant\'s local time) when new reservations become available, if mentioned on the page. Examples: "10:00 AM", "midnight", "noon", "9:00 AM EST". null if not mentioned.',
+    },
     reasoning: {
       type: SchemaType.STRING as const,
       description:
         "Brief explanation of how the provider was determined and what signals were found.",
     },
   },
-  required: ["provider", "url", "externalId", "openingWindowDays", "openingPattern", "reasoning"],
+  required: ["provider", "url", "externalId", "openingWindowDays", "openingPattern", "openingTime", "reasoning"],
 };
 
 const SYSTEM_PROMPT = `You are analyzing a restaurant's website to determine how they handle reservations.
@@ -151,6 +159,7 @@ Your job is to determine:
 - The provider-specific external ID from the booking URL
 - Whether the page mentions how far in advance reservations open (opening window)
 - Whether reservations are released on a rolling basis or in bulk
+- What time of day new reservations become available (e.g. "10:00 AM", "midnight", "noon") — this is the time they DROP or are released, not when the restaurant opens for dining
 
 Important rules:
 - Look at ACTUAL booking links and what the page text says. A stale/unused script embed (e.g. a resy embed.js with no corresponding booking link) should be ignored if the page clearly uses a different provider.
@@ -179,6 +188,7 @@ export async function scanWebsiteForReservation(
     externalId: null,
     openingWindowDays: null,
     openingPattern: null,
+    openingTime: null,
     signals: [],
   };
 
@@ -209,7 +219,7 @@ export async function scanWebsiteForReservation(
     const page = await context.newPage();
 
     // Load homepage
-    await page.goto(websiteUrl, { waitUntil: "networkidle", timeout: 15_000 });
+    await page.goto(websiteUrl, { waitUntil: "domcontentloaded", timeout: 15_000 });
     homepageText = await extractVisibleText(page);
     homepageLinks = await extractLinks(page);
     homepageEmbeds = await extractEmbeds(page);
@@ -219,7 +229,7 @@ export async function scanWebsiteForReservation(
     reservationPageUrl = findReservationLink(homepageLinks, websiteUrl);
     if (reservationPageUrl) {
       try {
-        await page.goto(reservationPageUrl, { waitUntil: "networkidle", timeout: 15_000 });
+        await page.goto(reservationPageUrl, { waitUntil: "domcontentloaded", timeout: 15_000 });
         reservationPageText = await extractVisibleText(page);
         reservationPageLinks = await extractLinks(page);
         reservationPageEmbeds = await extractEmbeds(page);
@@ -309,6 +319,7 @@ ${embedsStr || "(none)"}`;
     result.externalId = parsed.externalId ?? null;
     result.openingWindowDays = parsed.openingWindowDays ?? null;
     result.openingPattern = parsed.openingPattern ?? null;
+    result.openingTime = parsed.openingTime ?? null;
     if (parsed.reasoning) {
       result.signals.push(`gemini: ${parsed.reasoning}`);
     }
