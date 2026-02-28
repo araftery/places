@@ -11,15 +11,18 @@
     "./nyt": "./src/nyt/index.ts",
     "./resy": "./src/resy/index.ts",
     "./opentable": "./src/opentable/index.ts",
+    "./sevenrooms": "./src/sevenrooms/index.ts",
     "./proxy": "./src/proxy.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "undici": "^7.0.0"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
   }
 }

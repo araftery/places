@@ -22,6 +22,15 @@ export type {
   OpenTableOpeningWindow,
 } from "./opentable/index.js";
 
+export { createSevenRoomsClient } from "./sevenrooms/index.js";
+export type {
+  SevenRoomsClient,
+  SevenRoomsClientConfig,
+  SevenRoomsAvailability,
+  SevenRoomsSlot,
+  SevenRoomsOpeningWindow,
+} from "./sevenrooms/index.js";
+
 export { createFetch } from "./proxy";
 export type { ProxyConfig } from "./proxy";
 
