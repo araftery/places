@@ -13,6 +13,15 @@ export type { NytClient, NytClientConfig } from "./nyt/index";
 export { createResyClient } from "./resy/index";
 export type { ResyClient, ResyClientConfig, ResySearchResult, ResyVenue, ResyCalendar, ResyCalendarDay, ResySlot } from "./resy/index";
 
+export { createOpenTableClient } from "./opentable/index.js";
+export type {
+  OpenTableClient,
+  OpenTableClientConfig,
+  OpenTableAvailability,
+  OpenTableSlot,
+  OpenTableOpeningWindow,
+} from "./opentable/index.js";
+
 export { createFetch } from "./proxy";
 export type { ProxyConfig } from "./proxy";
 

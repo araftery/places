@@ -4,6 +4,7 @@ import {
   createBeliClient,
   createNytClient,
   createResyClient,
+  createOpenTableClient,
 } from "@places/clients";
 
 function getProxyUrl(sessionId: string): string | undefined {
@@ -50,6 +51,12 @@ export function getNytClient(sessionId: string) {
 export function getResyClient(sessionId: string) {
   return createResyClient({
     apiKey: process.env.RESY_API_KEY!,
+    proxyUrl: getProxyUrl(sessionId),
+  });
+}
+
+export function getOpenTableClient(sessionId: string) {
+  return createOpenTableClient({
     proxyUrl: getProxyUrl(sessionId),
   });
 }

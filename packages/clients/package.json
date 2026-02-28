@@ -10,6 +10,7 @@
     "./beli": "./src/beli/index.ts",
     "./nyt": "./src/nyt/index.ts",
     "./resy": "./src/resy/index.ts",
+    "./opentable": "./src/opentable/index.ts",
     "./proxy": "./src/proxy.ts"
   },
   "scripts": {
