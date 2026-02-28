@@ -36,7 +36,16 @@ Shared Drizzle ORM schema and lazy-proxy DB connection. Used by both `@places/we
 
 Standalone API clients for scraping/querying restaurant review sources. Each client exposes `search()` and `lookup()` methods returning a common `SearchResult`/`LookupResult` shape. All clients support optional `proxyUrl` config for routing through Oxylabs.
 
-Clients: **Google Places**, **The Infatuation**, **Beli**, **NYT Cooking/Restaurant Reviews**
+Clients: **Google Places**, **The Infatuation**, **Beli**, **NYT Cooking/Restaurant Reviews**, **Resy**, **OpenTable**
+
+Also includes a **Website Scanner** utility (`packages/clients/src/website-scanner/index.ts`) — not a traditional client but a `scanWebsiteForReservation(url, options)` function that:
+1. Uses **Playwright** (headless Chromium) to load a restaurant's website with full JS rendering, optionally proxied through **Oxylabs**
+2. **Two-hop scan**: loads homepage, then follows any internal "Reservations" link to also scan that page
+3. Extracts visible text, links, and script/iframe embeds from both pages
+4. Sends the extracted content to **Google Gemini** (`gemini-flash-latest`) for structured analysis
+5. Returns detected reservation provider, booking URL, external ID, opening window, and opening pattern
+
+Requires `GEMINI_API_KEY` env var (stored in `jobs/.env`). Dependencies: `playwright`, `@google/generative-ai`.
 
 ### `jobs/` — Trigger.dev Jobs (`@places/jobs`)
 
@@ -57,7 +66,9 @@ Async job system for multi-source rating scraping and scheduled audits:
 - **Mapbox GL JS** via `react-map-gl` v8 (import from `react-map-gl/mapbox`)
 - **Google Places API v1** (New API, not legacy)
 - **TravelTime API** for isochrones
-- **Oxylabs** proxy for scraping (optional, via `undici` ProxyAgent)
+- **Oxylabs** proxy for scraping (optional, via `undici` ProxyAgent and Playwright proxy config)
+- **Playwright** for headless browser scraping (website scanner)
+- **Google Gemini** (`gemini-flash-latest`) for LLM-based website analysis
 - **jose** for JWT session cookies
 - Single-user auth (password → JWT cookie)
 
@@ -158,6 +169,7 @@ BELI_PASSWORD             # Beli client auth
 BELI_USER_ID              # Beli client auth
 OXYLABS_USERNAME          # Proxy (optional)
 OXYLABS_PASSWORD          # Proxy (optional)
+GEMINI_API_KEY            # Google Gemini API key (website scanner)
 ```
 
 ## Database

@@ -34,4 +34,7 @@ export type {
 export { createFetch } from "./proxy";
 export type { ProxyConfig } from "./proxy";
 
+export { scanWebsiteForReservation } from "./website-scanner/index.js";
+export type { WebsiteScanResult, WebsiteScanOptions } from "./website-scanner/index.js";
+
 export type { SearchResult, LookupResult } from "./types";

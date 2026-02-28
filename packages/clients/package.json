@@ -12,13 +12,16 @@
     "./resy": "./src/resy/index.ts",
     "./opentable": "./src/opentable/index.ts",
     "./sevenrooms": "./src/sevenrooms/index.ts",
-    "./proxy": "./src/proxy.ts"
+    "./proxy": "./src/proxy.ts",
+    "./website-scanner": "./src/website-scanner/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "playwright": "^1.58.2",
     "undici": "^7.0.0"
   },
   "devDependencies": {
