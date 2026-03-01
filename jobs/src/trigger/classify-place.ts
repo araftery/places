@@ -203,13 +203,8 @@ export const classifyPlaceTask = task({
       })
       .where(eq(places.id, placeId));
 
-    // 7. Upsert cuisines + junction rows
+    // 7. Add cuisines (additive — don't delete existing ones)
     if (classification.cuisines.length > 0) {
-      // Clear existing place_cuisines
-      await db
-        .delete(placeCuisines)
-        .where(eq(placeCuisines.placeId, placeId));
-
       for (const cuisineName of classification.cuisines) {
         // Upsert cuisine (auto-grow the table)
         let [cuisine] = await db
