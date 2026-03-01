@@ -15,7 +15,7 @@ import IsochroneControl, {
   TIME_STEPS,
 } from "@/components/IsochroneControl";
 import MobileBottomSheet from "@/components/MobileBottomSheet";
-import { Place, Tag, City, Cuisine } from "@/lib/types";
+import { Place, Tag, City, Cuisine, List } from "@/lib/types";
 import { isInIsochrone, getTravelTimeBand, type TravelTimeBand } from "@/lib/geo";
 export type { TravelTimeBand } from "@/lib/geo";
 
@@ -32,7 +32,18 @@ export default function Home() {
   const [showManageTags, setShowManageTags] = useState(false);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"places" | "discover">("places");
+  const [lists, setLists] = useState<List[]>([]);
+  const [activeTab, setActiveTab] = useState<"places" | "discover" | "lists">("places");
+  const [buildingListId, setBuildingListIdRaw] = useState<number | null>(null);
+
+  const setBuildingListId = useCallback((id: number | null) => {
+    setBuildingListIdRaw(id);
+    if (id !== null) {
+      setActiveTab("places");
+    } else {
+      setActiveTab("lists");
+    }
+  }, []);
   const [loading, setLoading] = useState(true);
 
   // Preview pin from AddPlaceModal
@@ -90,6 +101,12 @@ export default function Home() {
     setCities(data);
   }, []);
 
+  const fetchLists = useCallback(async () => {
+    const res = await fetch("/api/lists");
+    const data = await res.json();
+    setLists(data);
+  }, []);
+
 
   // Detect viewport to avoid mounting DiscoverPanel in both Sidebar and MobileBottomSheet
   const [isMobile, setIsMobile] = useState(false);
@@ -103,10 +120,10 @@ export default function Home() {
   const geolocatedRef = useRef(false);
 
   useEffect(() => {
-    Promise.all([fetchPlaces(), fetchTags(), fetchCuisines(), fetchCities()]).finally(
+    Promise.all([fetchPlaces(), fetchTags(), fetchCuisines(), fetchCities(), fetchLists()]).finally(
       () => setLoading(false)
     );
-  }, [fetchPlaces, fetchTags, fetchCuisines, fetchCities]);
+  }, [fetchPlaces, fetchTags, fetchCuisines, fetchCities, fetchLists]);
 
   // On mount, geolocate user and fly map + auto-select closest city
   useEffect(() => {
@@ -173,6 +190,13 @@ export default function Home() {
     }
   }, [selectedCity, activeTab]);
 
+  // Auto-reset from lists tab if all lists deleted
+  useEffect(() => {
+    if (activeTab === "lists" && lists.length === 0) {
+      setActiveTab("places");
+    }
+  }, [activeTab, lists.length]);
+
   // Clear discover pins when switching to places tab
   const tabMountedRef = useRef(false);
   useEffect(() => {
@@ -180,7 +204,7 @@ export default function Home() {
       tabMountedRef.current = true;
       return;
     }
-    if (activeTab === "places") {
+    if (activeTab !== "discover") {
       setDiscoverPins([]);
       setSelectedDiscoverIndex(null);
     }
@@ -291,6 +315,90 @@ export default function Home() {
     }));
   }
 
+
+  async function handleCreateList(name: string): Promise<List> {
+    const res = await fetch("/api/lists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const list = await res.json();
+    setLists((prev) => [...prev, list]);
+    return list;
+  }
+
+  async function handleRenameList(id: number, name: string) {
+    const res = await fetch("/api/lists", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, name }),
+    });
+    const updated = await res.json();
+    setLists((prev) => prev.map((l) => (l.id === id ? updated : l)));
+  }
+
+  async function handleDeleteList(id: number) {
+    await fetch(`/api/lists?id=${id}`, { method: "DELETE" });
+    setLists((prev) => prev.filter((l) => l.id !== id));
+    // Remove list from all places' listIds
+    setPlaces((prev) =>
+      prev.map((p) => ({
+        ...p,
+        listIds: p.listIds.filter((lid) => lid !== id),
+      }))
+    );
+    // Clear filter if the deleted list was active
+    setFilters((prev) =>
+      prev.listId === id ? { ...prev, listId: null } : prev
+    );
+    // Exit build mode if building this list
+    if (buildingListId === id) setBuildingListId(null);
+  }
+
+  async function handleTogglePlaceInList(placeId: number, listId: number) {
+    const place = places.find((p) => p.id === placeId);
+    if (!place) return;
+    const isInList = place.listIds.includes(listId);
+
+    // Optimistic update
+    const updateListIds = (p: Place) =>
+      p.id === placeId
+        ? {
+            ...p,
+            listIds: isInList
+              ? p.listIds.filter((lid) => lid !== listId)
+              : [...p.listIds, listId],
+          }
+        : p;
+    setPlaces((prev) => prev.map(updateListIds));
+    setSelectedPlace((prev) => (prev ? updateListIds(prev) : prev));
+
+    try {
+      if (isInList) {
+        await fetch("/api/lists/places", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ placeId, listId }),
+        });
+      } else {
+        await fetch("/api/lists/places", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ placeId, listId }),
+        });
+      }
+    } catch {
+      // Revert on failure
+      setPlaces((prev) =>
+        prev.map((p) =>
+          p.id === placeId ? { ...p, listIds: place.listIds } : p
+        )
+      );
+      setSelectedPlace((prev) =>
+        prev?.id === placeId ? { ...prev, listIds: place.listIds } : prev
+      );
+    }
+  }
 
   function handleSelectDiscoverIndex(index: number | null) {
     setSelectedDiscoverIndex(index);
@@ -407,6 +515,7 @@ export default function Home() {
           tags={tags}
           cuisines={cuisines}
           cities={cities}
+          lists={lists}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
           onOpenAdd={() => setShowAddModal(true)}
@@ -425,6 +534,12 @@ export default function Home() {
           onSelectDiscoverIndex={isMobile ? undefined : handleSelectDiscoverIndex}
           activeTab={activeTab}
           onActiveTabChange={setActiveTab}
+          buildingListId={buildingListId}
+          onBuildingListIdChange={setBuildingListId}
+          onCreateList={handleCreateList}
+          onRenameList={handleRenameList}
+          onDeleteList={handleDeleteList}
+          onTogglePlaceInList={handleTogglePlaceInList}
         />
       </div>
 
@@ -449,6 +564,8 @@ export default function Home() {
           discoverPins={discoverPins}
           selectedDiscoverIndex={selectedDiscoverIndex}
           onSelectDiscoverPin={handleSelectDiscoverIndex}
+          buildingListId={buildingListId}
+          onTogglePlaceInList={handleTogglePlaceInList}
         />
 
         {/* Isochrone controls */}
@@ -498,8 +615,11 @@ export default function Home() {
             onDelete={handleDeletePlace}
             tags={tags}
             cuisines={cuisines}
+            lists={lists}
             onCreateTag={handleCreateTag}
             onCuisineCreated={fetchCuisines}
+            onTogglePlaceInList={handleTogglePlaceInList}
+            onCreateList={handleCreateList}
           />
         </div>
       )}
@@ -511,6 +631,7 @@ export default function Home() {
           tags={tags}
           cuisines={cuisines}
           cities={cities}
+          lists={lists}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
           onOpenAdd={() => setShowAddModal(true)}
@@ -529,6 +650,12 @@ export default function Home() {
           onSelectDiscoverIndex={isMobile ? handleSelectDiscoverIndex : undefined}
           activeTab={activeTab}
           onActiveTabChange={setActiveTab}
+          buildingListId={buildingListId}
+          onBuildingListIdChange={setBuildingListId}
+          onCreateList={handleCreateList}
+          onRenameList={handleRenameList}
+          onDeleteList={handleDeleteList}
+          onTogglePlaceInList={handleTogglePlaceInList}
         />
       </div>
 
@@ -548,8 +675,11 @@ export default function Home() {
             onDelete={handleDeletePlace}
             tags={tags}
             cuisines={cuisines}
+            lists={lists}
             onCreateTag={handleCreateTag}
             onCuisineCreated={fetchCuisines}
+            onTogglePlaceInList={handleTogglePlaceInList}
+            onCreateList={handleCreateList}
           />
         </div>
       )}

@@ -49,6 +49,8 @@ interface MapProps {
   discoverPins?: DiscoverPin[];
   selectedDiscoverIndex?: number | null;
   onSelectDiscoverPin?: (index: number | null) => void;
+  buildingListId?: number | null;
+  onTogglePlaceInList?: (placeId: number, listId: number) => Promise<void>;
 }
 
 export default function Map({
@@ -66,6 +68,8 @@ export default function Map({
   discoverPins,
   selectedDiscoverIndex,
   onSelectDiscoverPin,
+  buildingListId,
+  onTogglePlaceInList,
 }: MapProps) {
   const mapRef = useRef<MapRef>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -187,7 +191,11 @@ export default function Map({
 
       {/* My Places pins — hidden when discover mode is active */}
       {!discoverPins?.length && places.map((place) => {
-        const color = place.beenThere ? "#5a7a5e" : "#5b7b9a";
+        const isBuildMode = !!buildingListId;
+        const isInBuildList = isBuildMode && place.listIds?.includes(buildingListId!);
+        const color = isBuildMode
+          ? (isInBuildList ? "#c47d2e" : "#6b6560")
+          : (place.beenThere ? "#5a7a5e" : "#5b7b9a");
         const icon = TYPE_ICONS[place.placeType || "other"] || "\u{1F4CD}";
         const isSelected = selectedPlace?.id === place.id;
 
@@ -199,25 +207,38 @@ export default function Map({
             anchor="bottom"
             onClick={(e) => {
               e.originalEvent.stopPropagation();
-              onSelectPlace(place);
+              if (isBuildMode && onTogglePlaceInList) {
+                onTogglePlaceInList(place.id, buildingListId!);
+              } else {
+                onSelectPlace(place);
+              }
             }}
           >
             <div
               className={`flex cursor-pointer flex-col items-center transition-transform duration-150 ${
-                isSelected ? "scale-125" : "hover:scale-110"
+                isSelected && !isBuildMode ? "scale-125" : "hover:scale-110"
               }`}
+              style={isBuildMode && !isInBuildList ? { opacity: 0.45 } : {}}
             >
               <div
                 className="flex h-8 w-8 items-center justify-center rounded-full text-sm"
                 style={{
-                  backgroundColor: !place.beenThere ? "#faf6f1" : color,
+                  backgroundColor: isBuildMode
+                    ? (isInBuildList ? "#c47d2e" : "#faf6f1")
+                    : (!place.beenThere ? "#faf6f1" : color),
                   border: `2.5px solid ${color}`,
-                  boxShadow: isSelected
+                  boxShadow: isSelected && !isBuildMode
                     ? `0 0 0 2px #c47d2e, 0 2px 8px rgba(0,0,0,0.2)`
                     : "0 1px 4px rgba(0,0,0,0.15)",
                 }}
               >
-                {icon}
+                {isBuildMode && isInBuildList ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  icon
+                )}
               </div>
               {/* Drop shadow / pin point */}
               <div

@@ -1,10 +1,11 @@
 "use client";
 
-import { Place, Tag, City, Cuisine, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, City, Cuisine, List, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 
 import DiscoverPanel from "./DiscoverPanel";
 import type { DiscoverPin } from "./DiscoverPanel";
+import ListsPanel from "./ListsPanel";
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { TravelTimeBand } from "@/lib/geo";
 
@@ -15,6 +16,7 @@ interface SidebarProps {
   tags: Tag[];
   cuisines: Cuisine[];
   cities: City[];
+  lists: List[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
   onOpenAdd: () => void;
@@ -31,8 +33,14 @@ interface SidebarProps {
   onDiscoverPinsChange?: (pins: DiscoverPin[]) => void;
   selectedDiscoverIndex?: number | null;
   onSelectDiscoverIndex?: (index: number | null) => void;
-  activeTab: "places" | "discover";
-  onActiveTabChange: (tab: "places" | "discover") => void;
+  activeTab: "places" | "discover" | "lists";
+  onActiveTabChange: (tab: "places" | "discover" | "lists") => void;
+  buildingListId?: number | null;
+  onBuildingListIdChange?: (id: number | null) => void;
+  onCreateList?: (name: string) => Promise<List>;
+  onRenameList?: (id: number, name: string) => Promise<void>;
+  onDeleteList?: (id: number) => Promise<void>;
+  onTogglePlaceInList?: (placeId: number, listId: number) => Promise<void>;
 }
 
 export interface Filters {
@@ -47,6 +55,7 @@ export interface Filters {
   findTable: boolean;
   findTableDate: string;
   findTablePartySize: number;
+  listId: number | null;
 }
 
 export const DEFAULT_FILTERS: Filters = {
@@ -61,6 +70,7 @@ export const DEFAULT_FILTERS: Filters = {
   findTable: false,
   findTableDate: "",
   findTablePartySize: 2,
+  listId: null,
 };
 
 interface HoursPeriod {
@@ -131,6 +141,8 @@ export function applyFilters(places: Place[], filters: Filters): Place[] {
       return false;
 
     if (!filters.showArchived && p.archived) return false;
+
+    if (filters.listId && !p.listIds?.includes(filters.listId)) return false;
 
     if (filters.tagIds.length > 0) {
       const placeTagIds = p.tags.map((t) => t.id);
@@ -209,6 +221,7 @@ export default function Sidebar({
   tags,
   cuisines,
   cities,
+  lists,
   selectedPlace,
   onSelectPlace,
   onOpenAdd,
@@ -227,6 +240,12 @@ export default function Sidebar({
   onSelectDiscoverIndex,
   activeTab,
   onActiveTabChange,
+  buildingListId,
+  onBuildingListIdChange,
+  onCreateList,
+  onRenameList,
+  onDeleteList,
+  onTogglePlaceInList,
 }: SidebarProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("recent");
@@ -299,7 +318,8 @@ export default function Sidebar({
     filters.cuisineIds.length +
     filters.priceRange.length +
     (filters.openNow ? 1 : 0) +
-    (filters.findTable ? 1 : 0);
+    (filters.findTable ? 1 : 0) +
+    (filters.listId ? 1 : 0);
 
   const selectedCity = useMemo(
     () => (selectedCityId ? cities.find((c) => c.id === selectedCityId) : null),
@@ -374,7 +394,7 @@ export default function Sidebar({
         </div>
 
         {/* Tab bar */}
-        {hasDiscover && (
+        {(hasDiscover || lists.length > 0) && (
           <div className="mt-3 flex gap-4 border-b border-[var(--color-sidebar-border)]">
             <button
               onClick={() => onActiveTabChange("places")}
@@ -386,382 +406,505 @@ export default function Sidebar({
             >
               My Places
             </button>
-            <button
-              onClick={() => onActiveTabChange("discover")}
-              className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                activeTab === "discover"
-                  ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
-                  : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-              }`}
-            >
-              Discover
-            </button>
+            {hasDiscover && (
+              <button
+                onClick={() => onActiveTabChange("discover")}
+                className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                  activeTab === "discover"
+                    ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
+                    : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                }`}
+              >
+                Discover
+              </button>
+            )}
+            {lists.length > 0 && (
+              <button
+                onClick={() => onActiveTabChange("lists")}
+                className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                  activeTab === "lists"
+                    ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
+                    : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                }`}
+              >
+                Lists
+              </button>
+            )}
           </div>
         )}
 
         {activeTab === "places" && (
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="mt-3 flex items-center gap-1.5 text-sm text-[var(--color-sidebar-muted)] transition-colors hover:text-[var(--color-sidebar-text)]"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-1.5 text-sm text-[var(--color-sidebar-muted)] transition-colors hover:text-[var(--color-sidebar-text)]"
             >
-              <line x1="4" y1="6" x2="20" y2="6" />
-              <line x1="8" y1="12" x2="20" y2="12" />
-              <line x1="12" y1="18" x2="20" y2="18" />
-            </svg>
-            Filters
-            {activeFilterCount > 0 && (
-              <span className="rounded-full bg-[var(--color-amber)] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="8" y1="12" x2="20" y2="12" />
+                <line x1="12" y1="18" x2="20" y2="18" />
+              </svg>
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-[var(--color-amber)] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Discover Tab */}
-      {activeTab === "discover" && hasDiscover && selectedCity?.infatuationSlug && onDiscoverPinsChange && (
-        <div className="relative z-10 flex-1 overflow-y-auto py-3 sidebar-scroll">
-          <DiscoverPanel
-            citySlug={selectedCity.infatuationSlug}
-            cityId={selectedCity.id}
-            existingPlaces={allPlaces || places}
-            onPlaceAdded={onPlaceAdded || (() => { /* noop */ })}
-            onDiscoverPinsChange={onDiscoverPinsChange}
-            selectedDiscoverIndex={selectedDiscoverIndex ?? null}
-            onSelectDiscoverIndex={onSelectDiscoverIndex || (() => {})}
-            isoGeoJson={isoGeoJson}
-            onOpenPlace={onSelectPlace}
-          />
-        </div>
-      )}
-
-      {/* Filters Panel */}
-      {activeTab === "places" && showFilters && (
-        <div className="relative z-10 space-y-3 border-b border-[var(--color-sidebar-border)] px-5 py-4">
-          {/* Show Archived */}
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() =>
-                onFiltersChange({ ...filters, showArchived: !filters.showArchived })
-              }
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                filters.showArchived
-                  ? "bg-[var(--color-amber)] text-white"
-                  : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-              }`}
-            >
-              Show Archived
-            </button>
+      {/* Content area — relative container for drawer overlay */}
+      <div className="relative flex-1 overflow-hidden">
+        {/* Discover Tab */}
+        {activeTab === "discover" && hasDiscover && selectedCity?.infatuationSlug && onDiscoverPinsChange && (
+          <div className="h-full overflow-y-auto py-3 sidebar-scroll">
+            <DiscoverPanel
+              citySlug={selectedCity.infatuationSlug}
+              cityId={selectedCity.id}
+              existingPlaces={allPlaces || places}
+              onPlaceAdded={onPlaceAdded || (() => { /* noop */ })}
+              onDiscoverPinsChange={onDiscoverPinsChange}
+              selectedDiscoverIndex={selectedDiscoverIndex ?? null}
+              onSelectDiscoverIndex={onSelectDiscoverIndex || (() => {})}
+              isoGeoJson={isoGeoJson}
+              onOpenPlace={onSelectPlace}
+            />
           </div>
+        )}
 
-          {/* Open Now */}
-          <div>
-            <button
-              onClick={() =>
-                onFiltersChange({ ...filters, openNow: !filters.openNow })
-              }
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                filters.openNow
-                  ? "bg-[var(--color-amber)] text-white"
-                  : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-              }`}
-            >
-              Open Now
-            </button>
+        {/* Lists Tab */}
+        {activeTab === "lists" && onCreateList && onRenameList && onDeleteList && onBuildingListIdChange && onTogglePlaceInList && (
+          <div className="h-full overflow-y-auto py-3 sidebar-scroll">
+            <ListsPanel
+              lists={lists}
+              places={allPlaces || places}
+              selectedCityId={selectedCityId}
+              onCreateList={onCreateList}
+              onRenameList={onRenameList}
+              onDeleteList={onDeleteList}
+              onTogglePlaceInList={onTogglePlaceInList}
+              onSelectPlace={onSelectPlace}
+              onBuildingListIdChange={onBuildingListIdChange}
+              travelTimes={travelTimes}
+            />
           </div>
+        )}
 
-          {/* Find a Table */}
-          <div>
-            <button
-              onClick={() =>
-                onFiltersChange({ ...filters, findTable: !filters.findTable })
-              }
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                filters.findTable
-                  ? "bg-[var(--color-amber)] text-white"
-                  : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-              }`}
-            >
-              Find a Table
-            </button>
-            {filters.findTable && (
-              <div className="mt-2 space-y-2">
-                <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.findTableDate}
-                    onChange={(e) =>
-                      onFiltersChange({ ...filters, findTableDate: e.target.value })
-                    }
-                    className="mt-1 block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2.5 py-1.5 text-xs text-[var(--color-sidebar-text)] focus:border-[var(--color-amber)] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-                    Party Size
-                  </label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        onFiltersChange({
-                          ...filters,
-                          findTablePartySize: Math.max(1, filters.findTablePartySize - 1),
-                        })
-                      }
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-xs text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+        {/* Places Tab: build mode banner + place list */}
+        {activeTab === "places" && (
+          <div className="flex h-full flex-col">
+            {/* Build mode banner */}
+            {buildingListId && onBuildingListIdChange && (
+              <div className="border-b border-[var(--color-amber)]/30 bg-[var(--color-amber-dim)] px-4 py-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-amber)]">
+                      Adding to
+                    </p>
+                    <p
+                      className="text-sm font-semibold text-[var(--color-sidebar-text)]"
+                      style={{ fontFamily: "var(--font-libre-baskerville)" }}
                     >
-                      -
-                    </button>
-                    <span className="min-w-[1.5rem] text-center text-sm font-medium text-[var(--color-sidebar-text)]">
-                      {filters.findTablePartySize}
-                    </span>
-                    <button
-                      onClick={() =>
-                        onFiltersChange({
-                          ...filters,
-                          findTablePartySize: filters.findTablePartySize + 1,
-                        })
-                      }
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-xs text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-                    >
-                      +
-                    </button>
+                      {lists.find((l) => l.id === buildingListId)?.name}
+                    </p>
                   </div>
+                  <button
+                    onClick={() => onBuildingListIdChange(null)}
+                    className="rounded-md bg-[var(--color-amber)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-amber-light)]"
+                  >
+                    Done
+                  </button>
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-                  Tags
+            {/* Place list */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 sidebar-scroll">
+              <div className="mb-2.5 flex items-center justify-between">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                  {sortedPlaces.length} place{sortedPlaces.length !== 1 ? "s" : ""}
                 </p>
-                <button
-                  onClick={onManageTags}
-                  className="text-[11px] font-medium text-[var(--color-amber)] transition-colors hover:text-[var(--color-amber-light)]"
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="appearance-none bg-transparent text-[11px] font-medium text-[var(--color-sidebar-muted)] cursor-pointer pr-4 focus:outline-none hover:text-[var(--color-sidebar-text)]"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='%238a7e72' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 0 center",
+                  }}
                 >
-                  Manage
+                  <option value="recent">Recently added</option>
+                  <option value="rating">Highest rated</option>
+                  <option value="name">Name A–Z</option>
+                  {isochroneActive && <option value="nearest">Nearest</option>}
+                </select>
+              </div>
+              <div className="space-y-2">
+                {sortedPlaces.map((place, i) => (
+                  <div
+                    key={place.id}
+                    className="animate-fade-slide-in"
+                    style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
+                  >
+                    <PlaceCard
+                      place={place}
+                      isSelected={selectedPlace?.id === place.id}
+                      onClick={() => onSelectPlace(place)}
+                      travelTime={travelTimes?.get(place.id)}
+                      compact={sortedPlaces.length >= 10}
+                      buildingListId={buildingListId}
+                      onTogglePlaceInList={onTogglePlaceInList}
+                    />
+                  </div>
+                ))}
+                {sortedPlaces.length === 0 && (
+                  <p className="py-12 text-center text-sm text-[var(--color-sidebar-muted)]">
+                    No places found
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Filter drawer overlay */}
+        {activeTab === "places" && (
+          <>
+            {/* Backdrop */}
+            <div
+              className={`absolute inset-0 z-20 bg-black/40 transition-opacity duration-200 ${
+                showFilters ? "opacity-100" : "pointer-events-none opacity-0"
+              }`}
+              onClick={() => setShowFilters(false)}
+            />
+
+            {/* Drawer */}
+            <div
+              className={`absolute inset-y-0 left-0 z-30 w-[280px] overflow-y-auto border-r border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-bg)] px-4 py-4 shadow-lg transition-transform duration-200 ease-out sidebar-scroll ${
+                showFilters ? "translate-x-0" : "-translate-x-full"
+              }`}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-[var(--color-sidebar-text)]">Filters</p>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="rounded p-1 text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {tags.map((tag) => {
-                  const active = filters.tagIds.includes(tag.id);
-                  return (
-                    <button
-                      key={tag.id}
-                      onClick={() =>
-                        onFiltersChange({
-                          ...filters,
-                          tagIds: active
-                            ? filters.tagIds.filter((id) => id !== tag.id)
-                            : [...filters.tagIds, tag.id],
-                        })
-                      }
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                        active
-                          ? "text-white"
-                          : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-                      }`}
-                      style={active ? { backgroundColor: tag.color } : {}}
-                    >
-                      {tag.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
-          {/* Type */}
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-              Type
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {PLACE_TYPES.map((t) => {
-                const active = filters.placeTypes.includes(t.value);
-                return (
+              <div className="space-y-3">
+                {/* Show Archived */}
+                <div className="flex flex-wrap gap-1.5">
                   <button
-                    key={t.value}
                     onClick={() =>
-                      onFiltersChange({
-                        ...filters,
-                        placeTypes: active
-                          ? filters.placeTypes.filter((v) => v !== t.value)
-                          : [...filters.placeTypes, t.value],
-                      })
+                      onFiltersChange({ ...filters, showArchived: !filters.showArchived })
                     }
                     className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                      active
+                      filters.showArchived
                         ? "bg-[var(--color-amber)] text-white"
                         : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
                     }`}
                   >
-                    {t.label}
+                    Show Archived
                   </button>
-                );
-              })}
-            </div>
-          </div>
+                </div>
 
-          {/* Neighborhood */}
-          <div>
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-              Neighborhood
-            </p>
-            <select
-              value={filters.neighborhood}
-              onChange={(e) =>
-                onFiltersChange({ ...filters, neighborhood: e.target.value })
-              }
-              className="block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2 py-1.5 text-xs text-[var(--color-sidebar-text)]"
-            >
-              <option value="">All</option>
-              {neighborhoods.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Price Range */}
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-              Price Range
-            </p>
-            <div className="flex gap-1.5">
-              {[1, 2, 3, 4].map((p) => {
-                const active = filters.priceRange.includes(p);
-                return (
+                {/* Open Now */}
+                <div>
                   <button
-                    key={p}
                     onClick={() =>
-                      onFiltersChange({
-                        ...filters,
-                        priceRange: active
-                          ? filters.priceRange.filter((v) => v !== p)
-                          : [...filters.priceRange, p],
-                      })
+                      onFiltersChange({ ...filters, openNow: !filters.openNow })
                     }
                     className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                      active
+                      filters.openNow
                         ? "bg-[var(--color-amber)] text-white"
                         : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
                     }`}
                   >
-                    {"$".repeat(p)}
+                    Open Now
                   </button>
-                );
-              })}
-            </div>
-          </div>
+                </div>
 
-          {/* Cuisine */}
-          {usedCuisines.length > 0 && (
-            <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-                Cuisine
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {usedCuisines.map((c) => {
-                  const active = filters.cuisineIds.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() =>
+                {/* Find a Table */}
+                <div>
+                  <button
+                    onClick={() =>
+                      onFiltersChange({ ...filters, findTable: !filters.findTable })
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                      filters.findTable
+                        ? "bg-[var(--color-amber)] text-white"
+                        : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                    }`}
+                  >
+                    Find a Table
+                  </button>
+                  {filters.findTable && (
+                    <div className="mt-2 space-y-2">
+                      <div>
+                        <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                          Date
+                        </label>
+                        <input
+                          type="date"
+                          value={filters.findTableDate}
+                          onChange={(e) =>
+                            onFiltersChange({ ...filters, findTableDate: e.target.value })
+                          }
+                          className="mt-1 block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2.5 py-1.5 text-xs text-[var(--color-sidebar-text)] focus:border-[var(--color-amber)] focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                          Party Size
+                        </label>
+                        <div className="mt-1 flex items-center gap-2">
+                          <button
+                            onClick={() =>
+                              onFiltersChange({
+                                ...filters,
+                                findTablePartySize: Math.max(1, filters.findTablePartySize - 1),
+                              })
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-xs text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                          >
+                            -
+                          </button>
+                          <span className="min-w-[1.5rem] text-center text-sm font-medium text-[var(--color-sidebar-text)]">
+                            {filters.findTablePartySize}
+                          </span>
+                          <button
+                            onClick={() =>
+                              onFiltersChange({
+                                ...filters,
+                                findTablePartySize: filters.findTablePartySize + 1,
+                              })
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] text-xs text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tags */}
+                {tags.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                        Tags
+                      </p>
+                      <button
+                        onClick={onManageTags}
+                        className="text-[11px] font-medium text-[var(--color-amber)] transition-colors hover:text-[var(--color-amber-light)]"
+                      >
+                        Manage
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.map((tag) => {
+                        const active = filters.tagIds.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            onClick={() =>
+                              onFiltersChange({
+                                ...filters,
+                                tagIds: active
+                                  ? filters.tagIds.filter((id) => id !== tag.id)
+                                  : [...filters.tagIds, tag.id],
+                              })
+                            }
+                            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                              active
+                                ? "text-white"
+                                : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                            }`}
+                            style={active ? { backgroundColor: tag.color } : {}}
+                          >
+                            {tag.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Type */}
+                <div>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                    Type
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PLACE_TYPES.map((t) => {
+                      const active = filters.placeTypes.includes(t.value);
+                      return (
+                        <button
+                          key={t.value}
+                          onClick={() =>
+                            onFiltersChange({
+                              ...filters,
+                              placeTypes: active
+                                ? filters.placeTypes.filter((v) => v !== t.value)
+                                : [...filters.placeTypes, t.value],
+                            })
+                          }
+                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                            active
+                              ? "bg-[var(--color-amber)] text-white"
+                              : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Neighborhood */}
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                    Neighborhood
+                  </p>
+                  <select
+                    value={filters.neighborhood}
+                    onChange={(e) =>
+                      onFiltersChange({ ...filters, neighborhood: e.target.value })
+                    }
+                    className="block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2 py-1.5 text-xs text-[var(--color-sidebar-text)]"
+                  >
+                    <option value="">All</option>
+                    {neighborhoods.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Price Range */}
+                <div>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                    Price Range
+                  </p>
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3, 4].map((p) => {
+                      const active = filters.priceRange.includes(p);
+                      return (
+                        <button
+                          key={p}
+                          onClick={() =>
+                            onFiltersChange({
+                              ...filters,
+                              priceRange: active
+                                ? filters.priceRange.filter((v) => v !== p)
+                                : [...filters.priceRange, p],
+                            })
+                          }
+                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                            active
+                              ? "bg-[var(--color-amber)] text-white"
+                              : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                          }`}
+                        >
+                          {"$".repeat(p)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Cuisine */}
+                {usedCuisines.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                      Cuisine
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {usedCuisines.map((c) => {
+                        const active = filters.cuisineIds.includes(c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() =>
+                              onFiltersChange({
+                                ...filters,
+                                cuisineIds: active
+                                  ? filters.cuisineIds.filter((id) => id !== c.id)
+                                  : [...filters.cuisineIds, c.id],
+                              })
+                            }
+                            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                              active
+                                ? "bg-[var(--color-amber)] text-white"
+                                : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                            }`}
+                          >
+                            {c.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* List */}
+                {lists.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                      List
+                    </p>
+                    <select
+                      value={filters.listId ?? ""}
+                      onChange={(e) =>
                         onFiltersChange({
                           ...filters,
-                          cuisineIds: active
-                            ? filters.cuisineIds.filter((id) => id !== c.id)
-                            : [...filters.cuisineIds, c.id],
+                          listId: e.target.value ? parseInt(e.target.value) : null,
                         })
                       }
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                        active
-                          ? "bg-[var(--color-amber)] text-white"
-                          : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-                      }`}
+                      className="block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2 py-1.5 text-xs text-[var(--color-sidebar-text)]"
                     >
-                      {c.name}
-                    </button>
-                  );
-                })}
+                      <option value="">All</option>
+                      {lists.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => onFiltersChange(DEFAULT_FILTERS)}
+                  className="text-xs text-[var(--color-amber)] hover:text-[var(--color-amber-light)]"
+                >
+                  Clear all filters
+                </button>
               </div>
             </div>
-          )}
-
-          <button
-            onClick={() => onFiltersChange(DEFAULT_FILTERS)}
-            className="text-xs text-[var(--color-amber)] hover:text-[var(--color-amber-light)]"
-          >
-            Clear all filters
-          </button>
-        </div>
-      )}
-
-      {/* Place List */}
-      {activeTab === "places" && (
-        <div className="relative z-10 flex-1 overflow-y-auto px-4 py-3 sidebar-scroll">
-          <div className="mb-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-              {sortedPlaces.length} place{sortedPlaces.length !== 1 ? "s" : ""}
-            </p>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="appearance-none bg-transparent text-[11px] font-medium text-[var(--color-sidebar-muted)] cursor-pointer pr-4 focus:outline-none hover:text-[var(--color-sidebar-text)]"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='%238a7e72' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 0 center",
-              }}
-            >
-              <option value="recent">Recently added</option>
-              <option value="rating">Highest rated</option>
-              <option value="name">Name A–Z</option>
-              {isochroneActive && <option value="nearest">Nearest</option>}
-            </select>
-          </div>
-          <div className="space-y-2">
-            {sortedPlaces.map((place, i) => (
-              <div
-                key={place.id}
-                className="animate-fade-slide-in"
-                style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
-              >
-                <PlaceCard
-                  place={place}
-                  isSelected={selectedPlace?.id === place.id}
-                  onClick={() => onSelectPlace(place)}
-                  travelTime={travelTimes?.get(place.id)}
-                  compact={sortedPlaces.length >= 10}
-                />
-              </div>
-            ))}
-            {sortedPlaces.length === 0 && (
-              <p className="py-12 text-center text-sm text-[var(--color-sidebar-muted)]">
-                No places found
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

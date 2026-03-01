@@ -9,6 +9,12 @@ export interface Cuisine {
   name: string;
 }
 
+export interface List {
+  id: number;
+  name: string;
+  createdAt: string;
+}
+
 export interface City {
   id: number;
   name: string;
@@ -70,6 +76,7 @@ export interface Place {
   tags: Tag[];
   cuisines: Cuisine[];
   ratings: PlaceRating[];
+  listIds: number[];
 }
 
 export interface PlaceFormData {

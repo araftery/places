@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { places, placeTags, placeRatings, tags, cities, placeCuisines, cuisines } from "@/db/schema";
+import { places, placeTags, placeRatings, tags, cities, placeCuisines, cuisines, placeLists } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { tasks } from "@trigger.dev/sdk";
 
@@ -30,6 +30,8 @@ export async function GET() {
     .from(placeCuisines)
     .innerJoin(cuisines, eq(placeCuisines.cuisineId, cuisines.id));
 
+  const allPlaceLists = await db.select().from(placeLists);
+
   // Fetch cities for joining
   const allCities = await db.select().from(cities);
   const cityMap = new Map(allCities.map((c) => [c.id, c]));
@@ -55,12 +57,20 @@ export async function GET() {
     ratingsByPlace.set(r.placeId, arr);
   }
 
+  const listIdsByPlace = new Map<number, number[]>();
+  for (const pl of allPlaceLists) {
+    const arr = listIdsByPlace.get(pl.placeId) || [];
+    arr.push(pl.listId);
+    listIdsByPlace.set(pl.placeId, arr);
+  }
+
   const result = allPlaces.map((p) => ({
     ...p,
     cityName: p.cityId ? (cityMap.get(p.cityId)?.name ?? null) : null,
     tags: tagsByPlace.get(p.id) || [],
     cuisines: cuisinesByPlace.get(p.id) || [],
     ratings: ratingsByPlace.get(p.id) || [],
+    listIds: listIdsByPlace.get(p.id) || [],
   }));
 
   return NextResponse.json(result);

@@ -1,9 +1,9 @@
 "use client";
 
-import { Place, Tag, Cuisine, PlaceRating, PLACE_TYPES, RESERVATION_PROVIDERS } from "@/lib/types";
+import { Place, Tag, Cuisine, List, PlaceRating, PLACE_TYPES, RESERVATION_PROVIDERS } from "@/lib/types";
 import { generateReviewLinks } from "@/lib/review-links";
 import { formatRating, formatCount, getBestBlurb } from "@/lib/format-ratings";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
 
@@ -23,8 +23,11 @@ interface PlaceDetailProps {
   onDelete: (id: number) => void;
   tags: Tag[];
   cuisines: Cuisine[];
+  lists?: List[];
   onCreateTag: (name: string) => Promise<Tag>;
   onCuisineCreated: () => void;
+  onTogglePlaceInList?: (placeId: number, listId: number) => Promise<void>;
+  onCreateList?: (name: string) => Promise<List>;
 }
 
 function ChevronIcon({ expanded }: { expanded: boolean }) {
@@ -185,10 +188,16 @@ export default function PlaceDetail({
   onDelete,
   tags,
   cuisines,
+  lists,
   onCreateTag,
   onCuisineCreated,
+  onTogglePlaceInList,
+  onCreateList,
 }: PlaceDetailProps) {
   const [editing, setEditing] = useState(false);
+  const [showListPopover, setShowListPopover] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const listPopoverRef = useRef<HTMLDivElement>(null);
   const [beenThere, setBeenThere] = useState(place.beenThere);
   const [placeType, setPlaceType] = useState(place.placeType || "");
   const [notes, setNotes] = useState(place.personalNotes || "");
@@ -269,6 +278,19 @@ export default function PlaceDetail({
     const bi = RATING_SOURCE_ORDER.indexOf(b.source);
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
+
+  // Close list popover on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (listPopoverRef.current && !listPopoverRef.current.contains(e.target as Node)) {
+        setShowListPopover(false);
+      }
+    }
+    if (showListPopover) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showListPopover]);
 
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
 
@@ -972,6 +994,93 @@ export default function PlaceDetail({
                     {cuisine.name}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* Lists */}
+            {lists && onTogglePlaceInList && !editing && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                  Lists
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {lists
+                    .filter((l) => place.listIds?.includes(l.id))
+                    .map((l) => (
+                      <span
+                        key={l.id}
+                        className="rounded-md border border-[var(--color-amber)]/30 bg-[var(--color-amber)]/10 px-2 py-0.5 text-[11px] font-semibold text-[var(--color-amber)]"
+                      >
+                        {l.name}
+                      </span>
+                    ))}
+                  <div className="relative" ref={listPopoverRef}>
+                    <button
+                      onClick={() => setShowListPopover(!showListPopover)}
+                      className="rounded-md border border-dashed border-[#d4c9bb] px-2 py-0.5 text-[11px] font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
+                    >
+                      + Add to list
+                    </button>
+                    {showListPopover && (
+                      <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-[#e0d6ca] bg-[var(--color-parchment)] p-2 shadow-lg">
+                        {lists.map((l) => {
+                          const isInList = place.listIds?.includes(l.id);
+                          return (
+                            <button
+                              key={l.id}
+                              onClick={() => onTogglePlaceInList(place.id, l.id)}
+                              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-[var(--color-cream)]"
+                            >
+                              <span
+                                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                  isInList
+                                    ? "border-[var(--color-amber)] bg-[var(--color-amber)] text-white"
+                                    : "border-[#d4c9bb]"
+                                }`}
+                              >
+                                {isInList && (
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                )}
+                              </span>
+                              <span className="text-[var(--color-ink)]">{l.name}</span>
+                            </button>
+                          );
+                        })}
+                        {lists.length === 0 && (
+                          <p className="px-2 py-1 text-xs text-[var(--color-ink-muted)]">No lists yet</p>
+                        )}
+                        <div className="mt-1 border-t border-[#e0d6ca] pt-1">
+                          <form
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!newListName.trim() || !onCreateList) return;
+                              const created = await onCreateList(newListName.trim());
+                              setNewListName("");
+                              await onTogglePlaceInList(place.id, created.id);
+                            }}
+                            className="flex gap-1"
+                          >
+                            <input
+                              value={newListName}
+                              onChange={(e) => setNewListName(e.target.value)}
+                              placeholder="New list..."
+                              className="flex-1 rounded-md border border-[#d4c9bb] bg-white px-2 py-1 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!newListName.trim()}
+                              className="rounded-md bg-[var(--color-amber)] px-2 py-1 text-xs font-semibold text-white disabled:opacity-40"
+                            >
+                              Add
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 

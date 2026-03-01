@@ -13,6 +13,8 @@ interface PlaceCardProps {
   onClick: () => void;
   travelTime?: TravelTimeBand | null;
   compact?: boolean;
+  buildingListId?: number | null;
+  onTogglePlaceInList?: (placeId: number, listId: number) => void;
 }
 
 export default function PlaceCard({
@@ -21,20 +23,49 @@ export default function PlaceCard({
   onClick,
   travelTime,
   compact,
+  buildingListId,
+  onTogglePlaceInList,
 }: PlaceCardProps) {
+  const isBuildMode = !!buildingListId && !!onTogglePlaceInList;
+  const isInBuildList = isBuildMode && place.listIds?.includes(buildingListId!);
+
+  const handleClick = () => {
+    if (isBuildMode) {
+      onTogglePlaceInList!(place.id, buildingListId!);
+    } else {
+      onClick();
+    }
+  };
   const googleRating = place.ratings?.find((r) => r.source === "google");
 
   if (compact) {
     return (
       <button
-        onClick={onClick}
+        onClick={handleClick}
         className={`group w-full rounded-lg border px-3 py-2 text-left transition-all ${
-          isSelected
-            ? "border-[var(--color-amber)]/50 bg-[var(--color-amber-dim)]"
-            : "border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] hover:border-[var(--color-sidebar-muted)]/50 hover:bg-[var(--color-sidebar-surface)]/80"
+          isBuildMode && isInBuildList
+            ? "border-[var(--color-amber)]/40 bg-[var(--color-amber-dim)]"
+            : isSelected
+              ? "border-[var(--color-amber)]/50 bg-[var(--color-amber-dim)]"
+              : "border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] hover:border-[var(--color-sidebar-muted)]/50 hover:bg-[var(--color-sidebar-surface)]/80"
         }`}
       >
         <div className="flex items-center justify-between gap-2">
+          {isBuildMode && (
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                isInBuildList
+                  ? "border-[var(--color-amber)] bg-[var(--color-amber)] text-white"
+                  : "border-[var(--color-sidebar-muted)]/40"
+              }`}
+            >
+              {isInBuildList && (
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </span>
+          )}
           <h3
             className={`truncate text-sm font-semibold leading-tight ${
               isSelected
@@ -103,14 +134,31 @@ export default function PlaceCard({
 
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className={`group w-full rounded-lg border p-3 text-left transition-all ${
-        isSelected
-          ? "border-[var(--color-amber)]/50 bg-[var(--color-amber-dim)]"
-          : "border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] hover:border-[var(--color-sidebar-muted)]/50 hover:bg-[var(--color-sidebar-surface)]/80"
+        isBuildMode && isInBuildList
+          ? "border-[var(--color-amber)]/40 bg-[var(--color-amber-dim)]"
+          : isSelected
+            ? "border-[var(--color-amber)]/50 bg-[var(--color-amber-dim)]"
+            : "border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] hover:border-[var(--color-sidebar-muted)]/50 hover:bg-[var(--color-sidebar-surface)]/80"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
+        {isBuildMode && (
+          <span
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+              isInBuildList
+                ? "border-[var(--color-amber)] bg-[var(--color-amber)] text-white"
+                : "border-[var(--color-sidebar-muted)]/40"
+            }`}
+          >
+            {isInBuildList && (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <h3
             className={`text-sm font-semibold leading-tight ${
