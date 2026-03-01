@@ -37,6 +37,7 @@ export function isInIsochrone(
 export interface TravelTimeBand {
   minutes: number;
   color: string;
+  label?: string; // e.g. "walk", "transit", "drive" for mixed mode
 }
 
 export function getTravelTimeBand(
@@ -44,15 +45,36 @@ export function getTravelTimeBand(
   lng: number,
   geoJson: GeoJSON.FeatureCollection
 ): TravelTimeBand | null {
+  // For mixed mode, prefer the tightest band: smallest minutes first, then
+  // walk < transit < drive for same minutes
+  const MODE_PRIORITY: Record<string, number> = {
+    walking: 0,
+    public_transport: 1,
+    driving: 2,
+  };
   let best: TravelTimeBand | null = null;
+  let bestMinutes = Infinity;
+  let bestModePriority = Infinity;
   for (const feature of geoJson.features) {
-    const props = feature.properties as { minutes: number; color: string } | null;
+    const props = feature.properties as {
+      minutes: number;
+      color: string;
+      mode?: string;
+      label?: string;
+    } | null;
     if (!props) continue;
     if (feature.geometry.type === "Polygon") {
       const coords = feature.geometry.coordinates[0] as number[][];
       if (isPointInPolygon(lat, lng, coords)) {
-        if (!best || props.minutes < best.minutes) {
-          best = { minutes: props.minutes, color: props.color };
+        const mp = props.mode ? (MODE_PRIORITY[props.mode] ?? Infinity) : 0;
+        if (
+          !best ||
+          props.minutes < bestMinutes ||
+          (props.minutes === bestMinutes && mp < bestModePriority)
+        ) {
+          best = { minutes: props.minutes, color: props.color, label: props.label };
+          bestMinutes = props.minutes;
+          bestModePriority = mp;
         }
       }
     }

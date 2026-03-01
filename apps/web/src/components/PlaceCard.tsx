@@ -81,7 +81,7 @@ export default function PlaceCard({
           )}
           {travelTime && (
             <span style={{ color: travelTime.color }}>
-              &lt; {travelTime.minutes} min
+              &lt; {travelTime.minutes} min{travelTime.label ? ` ${travelTime.label}` : ""}
             </span>
           )}
           {place.closedPermanently && (
@@ -186,7 +186,7 @@ export default function PlaceCard({
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
-            &lt; {travelTime.minutes} min
+            &lt; {travelTime.minutes} min{travelTime.label ? ` ${travelTime.label}` : ""}
           </span>
         )}
       </div>

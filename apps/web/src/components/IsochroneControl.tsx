@@ -6,18 +6,31 @@ export interface IsochroneSettings {
   active: boolean;
   lat: number | null;
   lng: number | null;
-  mode: "walking" | "public_transport" | "driving";
+  mode: "walking" | "public_transport" | "driving" | "mixed";
 }
 
 export const TIME_STEPS: Record<string, number[]> = {
   walking: [10, 20, 30],
   public_transport: [15, 30, 45],
   driving: [15, 30, 45],
+  mixed: [10],
 };
 
-function getRingColors(steps: number[]): { minutes: number; color: string }[] {
+interface RingLegendItem {
+  label: string;
+  color: string;
+}
+
+function getRingColors(mode: string, steps: number[]): RingLegendItem[] {
+  if (mode === "mixed") {
+    return [
+      { label: "10 min walk", color: "#5a7a5e" },
+      { label: "10 min transit", color: "#c47d2e" },
+      { label: "20 min transit", color: "#b5543b" },
+    ];
+  }
   const palette = ["#b5543b", "#c47d2e", "#5a7a5e"];
-  return steps.map((m, i) => ({ minutes: m, color: palette[i] }));
+  return steps.map((m, i) => ({ label: `${m} min`, color: palette[i] }));
 }
 
 interface Suggestion {
@@ -46,6 +59,7 @@ const MODES = [
   { value: "walking", label: "Walk", icon: "\u{1F6B6}" },
   { value: "public_transport", label: "Transit", icon: "\u{1F687}" },
   { value: "driving", label: "Drive", icon: "\u{1F697}" },
+  { value: "mixed", label: "Mixed", icon: "\u{1F310}" },
 ] as const;
 
 export default function IsochroneControl({
@@ -122,7 +136,7 @@ export default function IsochroneControl({
   }, []);
 
   const steps = TIME_STEPS[settings.mode];
-  const rings = getRingColors(steps);
+  const rings = getRingColors(settings.mode, steps);
 
   if (!expanded) {
     return (
@@ -255,7 +269,7 @@ export default function IsochroneControl({
               <button
                 key={m.value}
                 onClick={() => onChange({ ...settings, mode: m.value })}
-                className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-all ${
+                className={`flex-1 rounded-md px-1.5 py-1.5 text-xs font-medium transition-all ${
                   settings.mode === m.value
                     ? "bg-[var(--color-amber)] text-white"
                     : "border border-[#d4c9bb] bg-[var(--color-cream)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
@@ -270,13 +284,13 @@ export default function IsochroneControl({
           {hasIsochrone && (
             <div className="mt-2.5 flex items-center justify-between rounded-md border border-[#e0d6ca] bg-[var(--color-cream)] px-2.5 py-2">
               {rings.map((ring) => (
-                <div key={ring.minutes} className="flex items-center gap-1.5">
+                <div key={ring.label} className="flex items-center gap-1.5">
                   <div
                     className="h-2.5 w-2.5 rounded-sm"
                     style={{ backgroundColor: ring.color, opacity: 0.7 }}
                   />
                   <span className="text-[10px] font-medium text-[var(--color-ink-muted)]">
-                    {ring.minutes} min
+                    {ring.label}
                   </span>
                 </div>
               ))}

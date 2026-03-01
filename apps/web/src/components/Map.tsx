@@ -263,7 +263,7 @@ export default function Map({
                 className="mt-1 text-[11px] font-semibold"
                 style={{ color: travelTimes.get(selectedPlace.id)!.color }}
               >
-                &lt; {travelTimes.get(selectedPlace.id)!.minutes} min
+                &lt; {travelTimes.get(selectedPlace.id)!.minutes} min{travelTimes.get(selectedPlace.id)!.label ? ` ${travelTimes.get(selectedPlace.id)!.label}` : ""}
               </p>
             )}
           </div>

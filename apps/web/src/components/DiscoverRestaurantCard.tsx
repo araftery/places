@@ -88,7 +88,7 @@ export default function DiscoverRestaurantCard({
               )}
               {travelTime && (
                 <span className="font-semibold" style={{ color: travelTime.color }}>
-                  &lt; {travelTime.minutes} min
+                  &lt; {travelTime.minutes} min{travelTime.label ? ` ${travelTime.label}` : ""}
                 </span>
               )}
               {showDate && restaurant.addedDate && (
