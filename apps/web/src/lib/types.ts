@@ -4,6 +4,11 @@ export interface Tag {
   color: string;
 }
 
+export interface Cuisine {
+  id: number;
+  name: string;
+}
+
 export interface City {
   id: number;
   name: string;
@@ -38,7 +43,7 @@ export interface Place {
   cityName: string | null;
   neighborhood: string | null;
   placeType: string | null;
-  cuisineType: string[] | null;
+  googlePlaceType: string | null;
   priceRange: number | null;
   websiteUrl: string | null;
   menuUrl: string | null;
@@ -63,6 +68,7 @@ export interface Place {
   createdAt: string;
   updatedAt: string;
   tags: Tag[];
+  cuisines: Cuisine[];
   ratings: PlaceRating[];
 }
 
@@ -74,7 +80,7 @@ export interface PlaceFormData {
   cityId: number | null;
   neighborhood: string | null;
   placeType: string | null;
-  cuisineType: string[] | null;
+  googlePlaceType: string | null;
   priceRange: number | null;
   websiteUrl: string | null;
   menuUrl: string | null;
@@ -102,23 +108,36 @@ export const RESERVATION_PROVIDERS = [
 ] as const;
 
 export const PLACE_TYPES = [
-  { value: "restaurant", label: "Restaurant" },
-  { value: "bar", label: "Bar" },
+  { value: "fine_dining", label: "Fine Dining" },
+  { value: "casual_dining", label: "Casual Dining" },
+  { value: "fast_casual", label: "Fast Casual" },
+  { value: "deli", label: "Deli" },
+  { value: "cocktail_bar", label: "Cocktail Bar" },
+  { value: "wine_bar", label: "Wine Bar" },
+  { value: "dive_bar", label: "Dive Bar" },
+  { value: "sports_bar", label: "Sports Bar" },
+  { value: "pub", label: "Pub" },
+  { value: "brewery", label: "Brewery" },
   { value: "cafe", label: "Cafe" },
-  { value: "tourist_site", label: "Tourist Site" },
-  { value: "retail", label: "Retail" },
-  { value: "night_club", label: "Night Club" },
   { value: "bakery", label: "Bakery" },
+  { value: "night_club", label: "Night Club" },
+  { value: "retail", label: "Retail" },
+  { value: "tourist_site", label: "Tourist Site" },
+  { value: "food_truck", label: "Food Truck" },
   { value: "other", label: "Other" },
 ] as const;
 
-export const GOOGLE_TYPE_MAP: Record<string, string> = {
-  // Direct matches
-  restaurant: "restaurant",
-  bar: "bar",
+export const GOOGLE_TO_DEFAULT_PLACE_TYPE: Record<string, string> = {
+  restaurant: "casual_dining",
+  bar: "dive_bar",
   cafe: "cafe",
   bakery: "bakery",
   night_club: "night_club",
+  coffee_shop: "cafe",
+  pub: "pub",
+  wine_bar: "wine_bar",
+  brewery: "brewery",
+  cocktail_bar: "cocktail_bar",
   // Tourist / attractions
   tourist_attraction: "tourist_site",
   museum: "tourist_site",
@@ -137,18 +156,12 @@ export const GOOGLE_TYPE_MAP: Record<string, string> = {
   clothing_store: "retail",
   grocery_store: "retail",
   supermarket: "retail",
-  // Aliases
-  coffee_shop: "cafe",
-  pub: "bar",
-  wine_bar: "bar",
-  brewery: "bar",
-  cocktail_bar: "bar",
   // Food variants
-  ice_cream_shop: "restaurant",
-  sandwich_shop: "restaurant",
-  pizza_restaurant: "restaurant",
-  steak_house: "restaurant",
-  seafood_restaurant: "restaurant",
-  meal_takeaway: "restaurant",
-  meal_delivery: "restaurant",
+  ice_cream_shop: "casual_dining",
+  sandwich_shop: "deli",
+  pizza_restaurant: "casual_dining",
+  steak_house: "casual_dining",
+  seafood_restaurant: "casual_dining",
+  meal_takeaway: "fast_casual",
+  meal_delivery: "fast_casual",
 };

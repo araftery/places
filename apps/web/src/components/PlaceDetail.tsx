@@ -1,6 +1,6 @@
 "use client";
 
-import { Place, Tag, PlaceRating, PLACE_TYPES, RESERVATION_PROVIDERS } from "@/lib/types";
+import { Place, Tag, Cuisine, PlaceRating, PLACE_TYPES, RESERVATION_PROVIDERS } from "@/lib/types";
 import { generateReviewLinks } from "@/lib/review-links";
 import { formatRating, formatCount, getBestBlurb } from "@/lib/format-ratings";
 import { useState } from "react";
@@ -22,7 +22,9 @@ interface PlaceDetailProps {
   onUpdate: (place: Place) => void;
   onDelete: (id: number) => void;
   tags: Tag[];
+  cuisines: Cuisine[];
   onCreateTag: (name: string) => Promise<Tag>;
+  onCuisineCreated: () => void;
 }
 
 function ChevronIcon({ expanded }: { expanded: boolean }) {
@@ -182,7 +184,9 @@ export default function PlaceDetail({
   onUpdate,
   onDelete,
   tags,
+  cuisines,
   onCreateTag,
+  onCuisineCreated,
 }: PlaceDetailProps) {
   const [editing, setEditing] = useState(false);
   const [beenThere, setBeenThere] = useState(place.beenThere);
@@ -193,6 +197,10 @@ export default function PlaceDetail({
     place.tags.map((t) => t.id)
   );
   const [newTagName, setNewTagName] = useState("");
+  const [selectedCuisineIds, setSelectedCuisineIds] = useState<number[]>(
+    place.cuisines?.map((c) => c.id) || []
+  );
+  const [newCuisineName, setNewCuisineName] = useState("");
   const [saving, setSaving] = useState(false);
   const [hoursExpanded, setHoursExpanded] = useState(false);
 
@@ -237,13 +245,16 @@ export default function PlaceDetail({
     ? getTodayHours(hoursDescriptions)
     : null;
 
-  // Compact info line: Type · $$$ · Neighborhood
+  // Compact info line: Type · Cuisine · $$$ · Neighborhood
   const infoLineParts: string[] = [];
   if (place.placeType) {
     const typeLabel =
       PLACE_TYPES.find((t) => t.value === place.placeType)?.label ||
       place.placeType;
     infoLineParts.push(typeLabel);
+  }
+  if (place.cuisines?.length) {
+    infoLineParts.push(place.cuisines.map((c) => c.name).join(", "));
   }
   if (place.priceRange) {
     infoLineParts.push(PRICE_LABELS[place.priceRange]);
@@ -279,6 +290,21 @@ export default function PlaceDetail({
     setNewTagName("");
   }
 
+  async function handleAddCuisine() {
+    if (!newCuisineName.trim()) return;
+    const res = await fetch("/api/cuisines", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newCuisineName.trim() }),
+    });
+    if (res.ok) {
+      const cuisine = await res.json();
+      setSelectedCuisineIds((prev) => [...prev, cuisine.id]);
+      setNewCuisineName("");
+      onCuisineCreated();
+    }
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -292,6 +318,7 @@ export default function PlaceDetail({
           personalNotes: notes || null,
           source: source || null,
           tagIds: selectedTagIds,
+          cuisineIds: selectedCuisineIds,
           reservationProvider: resProvider || null,
           reservationUrl: resUrl || null,
           openingWindowDays: resWindowDays ? parseInt(resWindowDays) : null,
@@ -304,7 +331,8 @@ export default function PlaceDetail({
       });
       const updated = await res.json();
       const updatedTags = tags.filter((t) => selectedTagIds.includes(t.id));
-      onUpdate({ ...place, ...updated, tags: updatedTags });
+      const updatedCuisines = cuisines.filter((c) => selectedCuisineIds.includes(c.id));
+      onUpdate({ ...place, ...updated, tags: updatedTags, cuisines: updatedCuisines });
       setEditing(false);
     } finally {
       setSaving(false);
@@ -378,11 +406,6 @@ export default function PlaceDetail({
         {infoLineParts.length > 0 && (
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
             {infoLineParts.join(" \u00b7 ")}
-          </p>
-        )}
-        {place.cuisineType && place.cuisineType.length > 0 && (
-          <p className="mt-0.5 text-sm text-[var(--color-ink-light)]">
-            {place.cuisineType.join(", ")}
           </p>
         )}
       </div>
@@ -499,6 +522,54 @@ export default function PlaceDetail({
                 />
                 <button
                   onClick={handleAddTag}
+                  type="button"
+                  className="rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+                Cuisines
+              </label>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {cuisines.map((cuisine) => (
+                  <button
+                    key={cuisine.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedCuisineIds((prev) =>
+                        prev.includes(cuisine.id)
+                          ? prev.filter((id) => id !== cuisine.id)
+                          : [...prev, cuisine.id]
+                      )
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                      selectedCuisineIds.includes(cuisine.id)
+                        ? "bg-[var(--color-amber)] text-white"
+                        : "border border-[#d4c9bb] bg-[var(--color-cream)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                    }`}
+                  >
+                    {cuisine.name}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={newCuisineName}
+                  onChange={(e) => setNewCuisineName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddCuisine();
+                    }
+                  }}
+                  className="flex-1 rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                  placeholder="New cuisine..."
+                />
+                <button
+                  onClick={handleAddCuisine}
                   type="button"
                   className="rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
                 >
@@ -881,16 +952,24 @@ export default function PlaceDetail({
               </div>
             )}
 
-            {/* Tags (no section label) */}
-            {place.tags.length > 0 && (
+            {/* Tags & Cuisines */}
+            {(place.tags.length > 0 || (place.cuisines?.length ?? 0) > 0) && (
               <div className="flex flex-wrap gap-1.5">
                 {place.tags.map((tag) => (
                   <span
-                    key={tag.id}
+                    key={`tag-${tag.id}`}
                     className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-white/90"
                     style={{ backgroundColor: tag.color }}
                   >
                     {tag.name}
+                  </span>
+                ))}
+                {place.cuisines?.map((cuisine) => (
+                  <span
+                    key={`cuisine-${cuisine.id}`}
+                    className="rounded-md border border-[var(--color-amber)]/30 bg-[var(--color-amber)]/10 px-2 py-0.5 text-[11px] font-semibold text-[var(--color-amber)]"
+                  >
+                    {cuisine.name}
                   </span>
                 ))}
               </div>
@@ -1035,6 +1114,8 @@ export default function PlaceDetail({
                   setPlaceType(place.placeType || "");
                   setSelectedTagIds(place.tags.map((t) => t.id));
                   setNewTagName("");
+                  setSelectedCuisineIds(place.cuisines?.map((c) => c.id) || []);
+                  setNewCuisineName("");
                   setEditing(false);
                 }}
                 className="rounded-md border border-[#d4c9bb] px-4 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-parchment-dark)]"
@@ -1052,6 +1133,8 @@ export default function PlaceDetail({
                   setSource(place.source || "");
                   setSelectedTagIds(place.tags.map((t) => t.id));
                   setNewTagName("");
+                  setSelectedCuisineIds(place.cuisines?.map((c) => c.id) || []);
+                  setNewCuisineName("");
                   setResProvider(place.reservationProvider || "");
                   setResUrl(place.reservationUrl || "");
                   setResWindowDays(place.openingWindowDays?.toString() || "");

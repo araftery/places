@@ -15,7 +15,7 @@ import IsochroneControl, {
   TIME_STEPS,
 } from "@/components/IsochroneControl";
 import MobileBottomSheet from "@/components/MobileBottomSheet";
-import { Place, Tag, City } from "@/lib/types";
+import { Place, Tag, City, Cuisine } from "@/lib/types";
 import { isInIsochrone, getTravelTimeBand, type TravelTimeBand } from "@/lib/geo";
 export type { TravelTimeBand } from "@/lib/geo";
 
@@ -24,6 +24,7 @@ const MapView = dynamic(() => import("@/components/Map"), { ssr: false });
 export default function Home() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [cuisines, setCuisines] = useState<Cuisine[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showDetail, setShowDetail] = useState(false);
@@ -77,6 +78,12 @@ export default function Home() {
     setTags(data);
   }, []);
 
+  const fetchCuisines = useCallback(async () => {
+    const res = await fetch("/api/cuisines");
+    const data = await res.json();
+    setCuisines(data);
+  }, []);
+
   const fetchCities = useCallback(async () => {
     const res = await fetch("/api/cities");
     const data = await res.json();
@@ -84,13 +91,22 @@ export default function Home() {
   }, []);
 
 
+  // Detect viewport to avoid mounting DiscoverPanel in both Sidebar and MobileBottomSheet
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   const geolocatedRef = useRef(false);
 
   useEffect(() => {
-    Promise.all([fetchPlaces(), fetchTags(), fetchCities()]).finally(
+    Promise.all([fetchPlaces(), fetchTags(), fetchCuisines(), fetchCities()]).finally(
       () => setLoading(false)
     );
-  }, [fetchPlaces, fetchTags, fetchCities]);
+  }, [fetchPlaces, fetchTags, fetchCuisines, fetchCities]);
 
   // On mount, geolocate user and fly map + auto-select closest city
   useEffect(() => {
@@ -389,6 +405,7 @@ export default function Home() {
         <Sidebar
           places={filteredPlaces}
           tags={tags}
+          cuisines={cuisines}
           cities={cities}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
@@ -403,9 +420,9 @@ export default function Home() {
           isoGeoJson={isoGeoJson}
           allPlaces={places}
           onPlaceAdded={handleDiscoverPlaceAdded}
-          onDiscoverPinsChange={handleDiscoverPinsChange}
-          selectedDiscoverIndex={selectedDiscoverIndex}
-          onSelectDiscoverIndex={handleSelectDiscoverIndex}
+          onDiscoverPinsChange={isMobile ? undefined : handleDiscoverPinsChange}
+          selectedDiscoverIndex={isMobile ? undefined : selectedDiscoverIndex}
+          onSelectDiscoverIndex={isMobile ? undefined : handleSelectDiscoverIndex}
           activeTab={activeTab}
           onActiveTabChange={setActiveTab}
         />
@@ -480,7 +497,9 @@ export default function Home() {
             onUpdate={handleUpdatePlace}
             onDelete={handleDeletePlace}
             tags={tags}
+            cuisines={cuisines}
             onCreateTag={handleCreateTag}
+            onCuisineCreated={fetchCuisines}
           />
         </div>
       )}
@@ -490,6 +509,7 @@ export default function Home() {
         <MobileBottomSheet
           places={filteredPlaces}
           tags={tags}
+          cuisines={cuisines}
           cities={cities}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
@@ -504,9 +524,9 @@ export default function Home() {
           isoGeoJson={isoGeoJson}
           allPlaces={places}
           onPlaceAdded={handleDiscoverPlaceAdded}
-          onDiscoverPinsChange={handleDiscoverPinsChange}
-          selectedDiscoverIndex={selectedDiscoverIndex}
-          onSelectDiscoverIndex={handleSelectDiscoverIndex}
+          onDiscoverPinsChange={isMobile ? handleDiscoverPinsChange : undefined}
+          selectedDiscoverIndex={isMobile ? selectedDiscoverIndex : undefined}
+          onSelectDiscoverIndex={isMobile ? handleSelectDiscoverIndex : undefined}
           activeTab={activeTab}
           onActiveTabChange={setActiveTab}
         />
@@ -527,7 +547,9 @@ export default function Home() {
             onUpdate={handleUpdatePlace}
             onDelete={handleDeletePlace}
             tags={tags}
+            cuisines={cuisines}
             onCreateTag={handleCreateTag}
+            onCuisineCreated={fetchCuisines}
           />
         </div>
       )}

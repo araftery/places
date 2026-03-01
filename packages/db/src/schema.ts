@@ -37,7 +37,7 @@ export const places = pgTable("places", {
   cityId: integer("city_id").references(() => cities.id),
   neighborhood: text("neighborhood"),
   placeType: text("place_type"),
-  cuisineType: jsonb("cuisine_type").$type<string[]>(),
+  googlePlaceType: text("google_place_type"),
   priceRange: smallint("price_range"),
   websiteUrl: text("website_url"),
   menuUrl: text("menu_url"),
@@ -120,4 +120,44 @@ export const placeAudits = pgTable(
       table.provider
     ),
   ]
+);
+
+export const cuisines = pgTable("cuisines", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const placeCuisines = pgTable(
+  "place_cuisines",
+  {
+    placeId: integer("place_id")
+      .notNull()
+      .references(() => places.id, { onDelete: "cascade" }),
+    cuisineId: integer("cuisine_id")
+      .notNull()
+      .references(() => cuisines.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.placeId, table.cuisineId] })]
+);
+
+export const lists = pgTable("lists", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  color: text("color"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const placeLists = pgTable(
+  "place_lists",
+  {
+    placeId: integer("place_id")
+      .notNull()
+      .references(() => places.id, { onDelete: "cascade" }),
+    listId: integer("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.placeId, table.listId] })]
 );

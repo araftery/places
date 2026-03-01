@@ -1,6 +1,6 @@
 "use client";
 
-import { Place, Tag, City, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, City, Cuisine, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 
 import DiscoverPanel from "./DiscoverPanel";
@@ -13,6 +13,7 @@ export type SortOption = "recent" | "rating" | "name" | "nearest";
 interface SidebarProps {
   places: Place[];
   tags: Tag[];
+  cuisines: Cuisine[];
   cities: City[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
@@ -40,7 +41,7 @@ export interface Filters {
   tagIds: number[];
   placeTypes: string[];
   neighborhood: string;
-  cuisine: string;
+  cuisineIds: number[];
   priceRange: number[];
   openNow: boolean;
   findTable: boolean;
@@ -54,7 +55,7 @@ export const DEFAULT_FILTERS: Filters = {
   tagIds: [],
   placeTypes: [],
   neighborhood: "",
-  cuisine: "",
+  cuisineIds: [],
   priceRange: [],
   openNow: false,
   findTable: false,
@@ -151,13 +152,9 @@ export function applyFilters(places: Place[], filters: Filters): Place[] {
     )
       return false;
 
-    if (filters.cuisine) {
-      const searchCuisine = filters.cuisine.toLowerCase();
-      if (
-        !p.cuisineType ||
-        !p.cuisineType.some((c) => c.toLowerCase().includes(searchCuisine))
-      )
-        return false;
+    if (filters.cuisineIds.length > 0) {
+      const placeCuisineIds = p.cuisines?.map((c) => c.id) || [];
+      if (!filters.cuisineIds.some((id) => placeCuisineIds.includes(id))) return false;
     }
 
     if (
@@ -210,6 +207,7 @@ export function applyFilters(places: Place[], filters: Filters): Place[] {
 export default function Sidebar({
   places,
   tags,
+  cuisines,
   cities,
   selectedPlace,
   onSelectPlace,
@@ -283,12 +281,22 @@ export default function Sidebar({
     return Array.from(set).sort();
   }, [places, selectedCityId]);
 
+  const usedCuisines = useMemo(() => {
+    const usedIds = new Set<number>();
+    for (const p of places) {
+      for (const c of p.cuisines || []) {
+        usedIds.add(c.id);
+      }
+    }
+    return cuisines.filter((c) => usedIds.has(c.id));
+  }, [places, cuisines]);
+
   const activeFilterCount =
     (filters.showArchived ? 1 : 0) +
     filters.tagIds.length +
     filters.placeTypes.length +
     (filters.neighborhood ? 1 : 0) +
-    (filters.cuisine ? 1 : 0) +
+    filters.cuisineIds.length +
     filters.priceRange.length +
     (filters.openNow ? 1 : 0) +
     (filters.findTable ? 1 : 0);
@@ -665,19 +673,38 @@ export default function Sidebar({
           </div>
 
           {/* Cuisine */}
-          <div>
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
-              Cuisine
-            </p>
-            <input
-              value={filters.cuisine}
-              onChange={(e) =>
-                onFiltersChange({ ...filters, cuisine: e.target.value })
-              }
-              className="block w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-2.5 py-1.5 text-xs text-[var(--color-sidebar-text)] placeholder-[var(--color-sidebar-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-              placeholder="e.g. Italian"
-            />
-          </div>
+          {usedCuisines.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                Cuisine
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {usedCuisines.map((c) => {
+                  const active = filters.cuisineIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          cuisineIds: active
+                            ? filters.cuisineIds.filter((id) => id !== c.id)
+                            : [...filters.cuisineIds, c.id],
+                        })
+                      }
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                        active
+                          ? "bg-[var(--color-amber)] text-white"
+                          : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <button
             onClick={() => onFiltersChange(DEFAULT_FILTERS)}

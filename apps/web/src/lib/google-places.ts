@@ -28,10 +28,10 @@ export interface MappedPlaceDetails {
   googleRating: number | null;
   googleRatingCount: number | null;
   primaryType: string | null;
+  googlePlaceType: string | null;
   types: string[];
   neighborhood: string | null;
   city: string | null;
-  cuisineTypes: string[];
 }
 
 export function mapGoogleDetailsToPlace(details: GooglePlaceResult): MappedPlaceDetails {
@@ -48,26 +48,6 @@ export function mapGoogleDetailsToPlace(details: GooglePlaceResult): MappedPlace
     components.find((c) => c.types.includes("administrative_area_level_1"))?.longText || null;
   const city = locality || postalTown || (sublocality ? adminLevel1 : null) || null;
 
-  const cuisineTypes = (details.types || [])
-    .filter(
-      (t) =>
-        t.endsWith("_restaurant") ||
-        ["italian_restaurant", "japanese_restaurant", "mexican_restaurant",
-         "chinese_restaurant", "indian_restaurant", "thai_restaurant",
-         "french_restaurant", "korean_restaurant", "vietnamese_restaurant",
-         "mediterranean_restaurant", "greek_restaurant", "spanish_restaurant",
-         "american_restaurant", "seafood_restaurant", "pizza_restaurant",
-         "sushi_restaurant", "steak_house", "barbecue_restaurant",
-         "ramen_restaurant", "brunch_restaurant", "vegetarian_restaurant",
-         "vegan_restaurant"].includes(t)
-    )
-    .map((t) =>
-      t
-        .replace("_restaurant", "")
-        .replace("_", " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase())
-    );
-
   return {
     googlePlaceId: details.id,
     name: details.displayName.text,
@@ -81,9 +61,9 @@ export function mapGoogleDetailsToPlace(details: GooglePlaceResult): MappedPlace
     googleRating: details.rating || null,
     googleRatingCount: details.userRatingCount || null,
     primaryType: details.primaryType || null,
+    googlePlaceType: details.primaryType || null,
     types: details.types || [],
     neighborhood: neighborhood || sublocality || null,
     city,
-    cuisineTypes,
   };
 }

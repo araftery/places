@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { places, placeTags, placeRatings, tags, cities } from "@/db/schema";
+import { places, placeTags, placeRatings, tags, cities, placeCuisines, cuisines } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { tasks } from "@trigger.dev/sdk";
 
@@ -21,6 +21,15 @@ export async function GET() {
 
   const allRatings = await db.select().from(placeRatings);
 
+  const allPlaceCuisines = await db
+    .select({
+      placeId: placeCuisines.placeId,
+      cuisineId: placeCuisines.cuisineId,
+      cuisineName: cuisines.name,
+    })
+    .from(placeCuisines)
+    .innerJoin(cuisines, eq(placeCuisines.cuisineId, cuisines.id));
+
   // Fetch cities for joining
   const allCities = await db.select().from(cities);
   const cityMap = new Map(allCities.map((c) => [c.id, c]));
@@ -30,6 +39,13 @@ export async function GET() {
     const arr = tagsByPlace.get(pt.placeId) || [];
     arr.push({ id: pt.tagId, name: pt.tagName, color: pt.tagColor });
     tagsByPlace.set(pt.placeId, arr);
+  }
+
+  const cuisinesByPlace = new Map<number, Array<{ id: number; name: string }>>();
+  for (const pc of allPlaceCuisines) {
+    const arr = cuisinesByPlace.get(pc.placeId) || [];
+    arr.push({ id: pc.cuisineId, name: pc.cuisineName });
+    cuisinesByPlace.set(pc.placeId, arr);
   }
 
   const ratingsByPlace = new Map<number, typeof allRatings>();
@@ -43,6 +59,7 @@ export async function GET() {
     ...p,
     cityName: p.cityId ? (cityMap.get(p.cityId)?.name ?? null) : null,
     tags: tagsByPlace.get(p.id) || [],
+    cuisines: cuisinesByPlace.get(p.id) || [],
     ratings: ratingsByPlace.get(p.id) || [],
   }));
 
@@ -94,7 +111,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   const body = await request.json();
-  const { id, tagIds, ...updateData } = body;
+  const { id, tagIds, cuisineIds, ...updateData } = body;
 
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
@@ -115,6 +132,18 @@ export async function PUT(request: NextRequest) {
         tagIds.map((tagId: number) => ({
           placeId: id,
           tagId,
+        }))
+      );
+    }
+  }
+
+  if (cuisineIds !== undefined) {
+    await db.delete(placeCuisines).where(eq(placeCuisines.placeId, id));
+    if (cuisineIds.length > 0) {
+      await db.insert(placeCuisines).values(
+        cuisineIds.map((cuisineId: number) => ({
+          placeId: id,
+          cuisineId,
         }))
       );
     }

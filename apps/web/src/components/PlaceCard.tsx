@@ -157,6 +157,11 @@ export default function PlaceCard({
             {place.placeType.replace("_", " ")}
           </span>
         )}
+        {place.cuisines?.length > 0 && (
+          <span className="text-[11px] text-[var(--color-sidebar-muted)]">
+            {place.cuisines.map((c) => c.name).join(", ")}
+          </span>
+        )}
         {place.priceRange && (
           <span className="text-[11px] text-[var(--color-sidebar-muted)]">
             {PRICE_LABELS[place.priceRange]}
@@ -170,11 +175,6 @@ export default function PlaceCard({
         {place.reservationProvider === "walk_in" && (place.placeType === "restaurant" || place.placeType === "cocktail_bar") && (
           <span className="text-[11px] text-[var(--color-sidebar-muted)]/70">
             Walk-in
-          </span>
-        )}
-        {place.cuisineType && place.cuisineType.length > 0 && (
-          <span className="text-[11px] text-[var(--color-sidebar-muted)]/70">
-            {place.cuisineType.join(", ")}
           </span>
         )}
         {travelTime && (

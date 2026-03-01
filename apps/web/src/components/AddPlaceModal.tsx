@@ -6,7 +6,7 @@ import {
   Place,
   City,
   PLACE_TYPES,
-  GOOGLE_TYPE_MAP,
+  GOOGLE_TO_DEFAULT_PLACE_TYPE,
   RESERVATION_PROVIDERS,
 } from "@/lib/types";
 
@@ -37,7 +37,7 @@ interface PlaceDetails {
   types: string[];
   neighborhood: string | null;
   city: string | null;
-  cuisineTypes: string[];
+  googlePlaceType: string | null;
 }
 
 interface AddPlaceModalProps {
@@ -72,7 +72,6 @@ export default function AddPlaceModal({
 
   // Form fields
   const [placeType, setPlaceType] = useState("");
-  const [cuisineType, setCuisineType] = useState("");
   const [cityId, setCityId] = useState<number | null>(null);
   const [neighborhood, setNeighborhood] = useState("");
   const [notes, setNotes] = useState("");
@@ -150,20 +149,15 @@ export default function AddPlaceModal({
       }
 
       // Auto-fill type from Google primaryType, then fall back to types array
-      if (data.primaryType && GOOGLE_TYPE_MAP[data.primaryType]) {
-        setPlaceType(GOOGLE_TYPE_MAP[data.primaryType]);
+      if (data.primaryType && GOOGLE_TO_DEFAULT_PLACE_TYPE[data.primaryType]) {
+        setPlaceType(GOOGLE_TO_DEFAULT_PLACE_TYPE[data.primaryType]);
       } else {
-        const fallback = data.types?.find((t: string) => GOOGLE_TYPE_MAP[t]);
-        if (fallback) setPlaceType(GOOGLE_TYPE_MAP[fallback]);
+        const fallback = data.types?.find((t: string) => GOOGLE_TO_DEFAULT_PLACE_TYPE[t]);
+        if (fallback) setPlaceType(GOOGLE_TO_DEFAULT_PLACE_TYPE[fallback]);
       }
 
       // Auto-fill neighborhood from Google address components
       if (data.neighborhood) setNeighborhood(data.neighborhood);
-
-      // Auto-fill cuisine from Google types
-      if (data.cuisineTypes.length > 0) {
-        setCuisineType(data.cuisineTypes.join(", "));
-      }
 
       // Auto-detect closest city
       if (data.lat && data.lng) {
@@ -256,9 +250,7 @@ export default function AddPlaceModal({
           cityId: cityId || null,
           neighborhood: neighborhood || null,
           placeType: placeType || null,
-          cuisineType: cuisineType
-            ? cuisineType.split(",").map((s) => s.trim())
-            : null,
+          googlePlaceType: details.googlePlaceType,
           priceRange: details.priceRange,
           websiteUrl: details.websiteUrl,
           phone: details.phone,
@@ -287,7 +279,6 @@ export default function AddPlaceModal({
     onPlacePreview?.(null);
     setDuplicateWarning(null);
     setPlaceType("");
-    setCuisineType("");
     setCityId(null);
     setNeighborhood("");
     setNotes("");
@@ -601,16 +592,6 @@ export default function AddPlaceModal({
                       {cityWarning}
                     </div>
                   )}
-
-                  <div>
-                    <label className={labelClass}>Cuisine (comma-separated)</label>
-                    <input
-                      value={cuisineType}
-                      onChange={(e) => setCuisineType(e.target.value)}
-                      className={inputClass}
-                      placeholder="Italian, Pizza"
-                    />
-                  </div>
 
                   {/* Tags */}
                   <div>

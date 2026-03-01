@@ -30,6 +30,7 @@ function getScrapers(sessionId: string): Record<string, (place: PlaceInfo) => Pr
 
 export const initiateCoverageTask = task({
   id: "initiate-coverage",
+  queue: { name: "coverage", concurrencyLimit: 5 },
   run: async (payload: { placeId: number }) => {
     logger.info("Starting coverage initiation", { placeId: payload.placeId });
 
@@ -178,6 +179,17 @@ export const initiateCoverageTask = task({
       logger.info("Triggered reservation detection", { placeId: place.id });
     } catch (err) {
       logger.error("Failed to trigger reservation detection", {
+        placeId: place.id,
+        error: extractError(err).fullMessage,
+      });
+    }
+
+    // Fire-and-forget Gemini classification
+    try {
+      await tasks.trigger("classify-place", { placeId: place.id });
+      logger.info("Triggered place classification", { placeId: place.id });
+    } catch (err) {
+      logger.error("Failed to trigger place classification", {
         placeId: place.id,
         error: extractError(err).fullMessage,
       });

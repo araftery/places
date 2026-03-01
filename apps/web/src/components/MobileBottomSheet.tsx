@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Place, Tag, City, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, City, Cuisine, PLACE_TYPES } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
 
 import DiscoverPanel from "./DiscoverPanel";
@@ -12,6 +12,7 @@ import type { TravelTimeBand } from "@/lib/geo";
 interface MobileBottomSheetProps {
   places: Place[];
   tags: Tag[];
+  cuisines: Cuisine[];
   cities: City[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
@@ -36,6 +37,7 @@ interface MobileBottomSheetProps {
 export default function MobileBottomSheet({
   places,
   tags,
+  cuisines,
   cities,
   selectedPlace,
   onSelectPlace,
@@ -98,6 +100,16 @@ export default function MobileBottomSheet({
     return sorted;
   }, [filteredPlaces, sortBy, travelTimes]);
 
+  const usedCuisines = useMemo(() => {
+    const usedIds = new Set<number>();
+    for (const p of places) {
+      for (const c of p.cuisines || []) {
+        usedIds.add(c.id);
+      }
+    }
+    return cuisines.filter((c) => usedIds.has(c.id));
+  }, [places, cuisines]);
+
   const selectedCity = useMemo(
     () => (selectedCityId ? cities.find((c) => c.id === selectedCityId) : null),
     [selectedCityId, cities]
@@ -146,12 +158,14 @@ export default function MobileBottomSheet({
             {(filters.showArchived ? 1 : 0) +
               filters.tagIds.length +
               filters.placeTypes.length +
+              filters.cuisineIds.length +
               (filters.openNow ? 1 : 0) >
               0 && (
               <span className="rounded bg-[var(--color-amber)] px-1 text-[10px] font-bold text-white">
                 {(filters.showArchived ? 1 : 0) +
                   filters.tagIds.length +
                   filters.placeTypes.length +
+                  filters.cuisineIds.length +
                   (filters.openNow ? 1 : 0)}
               </span>
             )}
@@ -327,6 +341,35 @@ export default function MobileBottomSheet({
               </button>
             ))}
           </div>
+          {usedCuisines.length > 0 && (
+            <>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                Cuisine
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {usedCuisines.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() =>
+                      onFiltersChange({
+                        ...filters,
+                        cuisineIds: filters.cuisineIds.includes(c.id)
+                          ? filters.cuisineIds.filter((id) => id !== c.id)
+                          : [...filters.cuisineIds, c.id],
+                      })
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                      filters.cuisineIds.includes(c.id)
+                        ? "bg-[var(--color-amber)] text-white"
+                        : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)]"
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <button
             onClick={() => onFiltersChange(DEFAULT_FILTERS)}
             className="text-xs text-[var(--color-amber)]"

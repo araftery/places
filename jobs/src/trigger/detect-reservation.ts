@@ -58,6 +58,7 @@ function parseTimeString(raw: string | null | undefined): string | null {
 
 export const detectReservationTask = task({
   id: "detect-reservation",
+  queue: { name: "reservation", concurrencyLimit: 3 },
   run: async (payload: DetectReservationPayload) => {
     const { placeId } = payload;
     logger.info("Starting reservation detection", {

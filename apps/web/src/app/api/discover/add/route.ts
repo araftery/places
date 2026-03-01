@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { places, placeRatings, cities as citiesTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { autocomplete, getPlaceDetails, mapGoogleDetailsToPlace } from "@/lib/google-places";
-import { GOOGLE_TYPE_MAP } from "@/lib/types";
+import { GOOGLE_TO_DEFAULT_PLACE_TYPE } from "@/lib/types";
 import { tasks } from "@trigger.dev/sdk";
 
 export const dynamic = "force-dynamic";
@@ -87,10 +87,14 @@ export async function POST(request: NextRequest) {
 
   // 4. Derive place type from Google types
   let placeType: string | null = null;
-  for (const t of mapped.types) {
-    if (GOOGLE_TYPE_MAP[t]) {
-      placeType = GOOGLE_TYPE_MAP[t];
-      break;
+  if (mapped.googlePlaceType && GOOGLE_TO_DEFAULT_PLACE_TYPE[mapped.googlePlaceType]) {
+    placeType = GOOGLE_TO_DEFAULT_PLACE_TYPE[mapped.googlePlaceType];
+  } else {
+    for (const t of mapped.types) {
+      if (GOOGLE_TO_DEFAULT_PLACE_TYPE[t]) {
+        placeType = GOOGLE_TO_DEFAULT_PLACE_TYPE[t];
+        break;
+      }
     }
   }
 
@@ -105,7 +109,7 @@ export async function POST(request: NextRequest) {
       cityId: cityId || null,
       neighborhood: mapped.neighborhood,
       placeType,
-      cuisineType: mapped.cuisineTypes.length > 0 ? mapped.cuisineTypes : null,
+      googlePlaceType: mapped.googlePlaceType,
       priceRange: mapped.priceRange,
       websiteUrl: mapped.websiteUrl,
       phone: mapped.phone,
@@ -168,6 +172,7 @@ export async function POST(request: NextRequest) {
       ...newPlace,
       cityName,
       tags: [],
+      cuisines: [],
       ratings,
     },
   });
