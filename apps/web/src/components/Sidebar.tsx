@@ -41,6 +41,8 @@ interface SidebarProps {
   onRenameList?: (id: number, name: string) => Promise<void>;
   onDeleteList?: (id: number) => Promise<void>;
   onTogglePlaceInList?: (placeId: number, listId: number) => Promise<void>;
+  viewingListId?: number | null;
+  onViewingListIdChange?: (id: number | null) => void;
 }
 
 export interface Filters {
@@ -246,6 +248,8 @@ export default function Sidebar({
   onRenameList,
   onDeleteList,
   onTogglePlaceInList,
+  viewingListId,
+  onViewingListIdChange,
 }: SidebarProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("recent");
@@ -253,6 +257,16 @@ export default function Sidebar({
 
   // Auto-switch to "nearest" when isochrone activates, revert when it deactivates
   const prevIsoRef = useRef(false);
+  const placeCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  // Scroll to selected place card when selection changes (e.g. from map click)
+  useEffect(() => {
+    if (!selectedPlace) return;
+    const el = placeCardRefs.current.get(selectedPlace.id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [selectedPlace]);
   useEffect(() => {
     if (isochroneActive && !prevIsoRef.current) {
       setPreSortBy(sortBy);
@@ -394,8 +408,7 @@ export default function Sidebar({
         </div>
 
         {/* Tab bar */}
-        {(hasDiscover || lists.length > 0) && (
-          <div className="mt-3 flex gap-4 border-b border-[var(--color-sidebar-border)]">
+        <div className="mt-3 flex gap-4 border-b border-[var(--color-sidebar-border)]">
             <button
               onClick={() => onActiveTabChange("places")}
               className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
@@ -418,20 +431,17 @@ export default function Sidebar({
                 Discover
               </button>
             )}
-            {lists.length > 0 && (
-              <button
-                onClick={() => onActiveTabChange("lists")}
-                className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                  activeTab === "lists"
-                    ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
-                    : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-                }`}
-              >
-                Lists
-              </button>
-            )}
+            <button
+              onClick={() => onActiveTabChange("lists")}
+              className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                activeTab === "lists"
+                  ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
+                  : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+              }`}
+            >
+              Lists
+            </button>
           </div>
-        )}
 
         {activeTab === "places" && (
           <div className="mt-3 flex items-center gap-3">
@@ -496,6 +506,8 @@ export default function Sidebar({
               onSelectPlace={onSelectPlace}
               onBuildingListIdChange={onBuildingListIdChange}
               travelTimes={travelTimes}
+              selectedListId={viewingListId ?? null}
+              onSelectedListIdChange={onViewingListIdChange}
             />
           </div>
         )}
@@ -554,6 +566,10 @@ export default function Sidebar({
                 {sortedPlaces.map((place, i) => (
                   <div
                     key={place.id}
+                    ref={(el) => {
+                      if (el) placeCardRefs.current.set(place.id, el);
+                      else placeCardRefs.current.delete(place.id);
+                    }}
                     className="animate-fade-slide-in"
                     style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
                   >

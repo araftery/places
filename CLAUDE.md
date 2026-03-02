@@ -110,6 +110,8 @@ For other packages:
 - **Review clients**: All clients in `packages/clients/src/` follow the factory pattern (`createXClient(config)`) and return a common `SearchResult`/`LookupResult` interface. All accept optional `proxyUrl`.
 - **Provider modules**: `jobs/src/providers/` encapsulate scraping logic per source. Both `initiate-coverage` and audit tasks use the same modules.
 - **Shared geo helpers**: `apps/web/src/lib/geo.ts` exports `isPointInPolygon`, `isInIsochrone`, `getTravelTimeBand`, and `TravelTimeBand` type. Used by both `page.tsx` and `DiscoverPanel` for isochrone filtering and travel time display.
+- **Map pins (native layers)**: My Places render as GPU-accelerated Mapbox GL circle layers (not React Markers) for performance at scale. A GeoJSON FeatureCollection is built via `useMemo` from `places` with properties like `categoryColor`, `isSelected`, `isBuildMode`. Layers: `place-shadows` (blurred shadow beneath), `place-dots` (filled circles with white stroke), `place-selected-ring` (amber ring). Click handling uses `interactiveLayerIds` + feature detection in the `onClick` handler. Isochrone layers use `beforeId="place-shadows"` to render below dots.
+- **Place type categories**: 17 place types map to 6 categories (`PLACE_TYPE_CATEGORY` in `types.ts`), each with a pastel color (`CATEGORY_COLORS`). Categories: sitdown_dining (terracotta), quick_eats (gold), cocktail_wine (plum), casual_bars (teal), cafes_bakeries (amber), other (taupe). Circle radius scales with zoom level via Mapbox `interpolate` expressions.
 
 ## Discover Tab (Infatuation Guide Browser)
 
@@ -137,7 +139,7 @@ Shared helper `mapGoogleDetailsToPlace()` in `apps/web/src/lib/google-places.ts`
 
 ### Key Behaviors
 
-- **Map pins**: When Discover tab is active, My Places pins are hidden. Discover pins use cream background (`#faf6f1`) with solid borders — amber for new restaurants, slate-blue for already-in-list.
+- **Map pins**: When Discover tab is active, My Places native layers are hidden (`showPlaces` flag). Discover pins are React Markers (small filled circles with white stroke) — amber for new restaurants, slate-blue for already-in-list.
 - **"Already in list" detection**: Matches by Infatuation review slug in `place_ratings.externalId` (source: `"infatuation"`), with name fallback. Uses slate-blue accent color in both map pins and sidebar cards.
 - **Isochrone integration**: Discover restaurants filter to those within the isochrone polygon. Travel time bands display on cards. Sort-by-nearest auto-activates when isochrone is active.
 - **Auto-open PlaceDetail**: Clicking an in-list card or in-list map pin opens the matching place's detail panel. Newly added places auto-open after the places list refreshes (via `pendingOpenPlaceId` state + effect). `DiscoverPin` includes `matchedPlaceId` for in-list pins so the map click can resolve the Place without going through DiscoverPanel.
@@ -202,7 +204,7 @@ Schema is in `packages/db/src/schema.ts`. Six tables: `cities`, `places`, `tags`
 - All section labels use `text-[11px] font-semibold uppercase tracking-wider` for a consistent editorial feel
 - Filter chips and tag chips use `rounded-md` (not fully rounded pills)
 - Active filter/tag chips get amber background (or tag color for tags); inactive get sidebar-surface
-- Map pins use CSS triangles for the pointed bottom; selected pins get an amber ring
+- Map pins are native Mapbox circle layers colored by place type category (pastel tones) with white strokes and subtle shadows; selected pins get an amber ring. Discover/preview pins are React Markers styled as small filled circles to match
 - Isochrone overlay uses amber with dashed outline
 - Grain texture overlay (`.grain::before`) on the sidebar via inline SVG noise
 - Stagger animation (`.animate-fade-slide-in`) on sidebar place list items

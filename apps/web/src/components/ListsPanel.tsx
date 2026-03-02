@@ -18,6 +18,8 @@ interface ListsPanelProps {
   onSelectPlace: (place: Place | null) => void;
   onBuildingListIdChange: (id: number | null) => void;
   travelTimes?: Map<number, TravelTimeBand>;
+  selectedListId: number | null;
+  onSelectedListIdChange?: (id: number | null) => void;
 }
 
 export default function ListsPanel({
@@ -31,8 +33,9 @@ export default function ListsPanel({
   onSelectPlace,
   onBuildingListIdChange,
   travelTimes,
+  selectedListId,
+  onSelectedListIdChange,
 }: ListsPanelProps) {
-  const [selectedListId, setSelectedListId] = useState<number | null>(null);
   const [newListName, setNewListName] = useState("");
   const [editingListId, setEditingListId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -95,7 +98,7 @@ export default function ListsPanel({
         {/* Sticky header */}
         <div className="sticky -top-3 z-10 bg-[var(--color-sidebar-bg)] pb-2 pt-1">
           <button
-            onClick={() => { setSelectedListId(null); setEditingDetail(false); }}
+            onClick={() => { onSelectedListIdChange(null); setEditingDetail(false); }}
             className="mb-1 flex items-center gap-1 text-xs text-[var(--color-sidebar-muted)] transition-colors hover:text-[var(--color-sidebar-text)]"
           >
             <svg
@@ -288,7 +291,7 @@ export default function ListsPanel({
               className="group flex items-center gap-2 rounded-lg border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] transition-colors hover:border-[var(--color-sidebar-muted)]/50"
             >
               <button
-                onClick={() => setSelectedListId(list.id)}
+                onClick={() => onSelectedListIdChange(list.id)}
                 className="flex min-w-0 flex-1 items-center justify-between px-3 py-2.5 text-left"
               >
                 <div className="min-w-0">

@@ -169,11 +169,7 @@ export default function Map({
           if (placeId != null) {
             const place = placesById[placeId];
             if (place) {
-              if (isBuildMode && onTogglePlaceInList) {
-                onTogglePlaceInList(place.id, buildingListId!);
-              } else {
-                onSelectPlace(place);
-              }
+              onSelectPlace(place);
               return;
             }
           }
@@ -189,9 +185,6 @@ export default function Map({
       onMapClick,
       placesById,
       onSelectPlace,
-      isBuildMode,
-      buildingListId,
-      onTogglePlaceInList,
     ]
   );
 

@@ -29,11 +29,10 @@ export default function PlaceCard({
   const isBuildMode = !!buildingListId && !!onTogglePlaceInList;
   const isInBuildList = isBuildMode && place.listIds?.includes(buildingListId!);
 
-  const handleClick = () => {
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (isBuildMode) {
       onTogglePlaceInList!(place.id, buildingListId!);
-    } else {
-      onClick();
     }
   };
   const googleRating = place.ratings?.find((r) => r.source === "google");
@@ -41,22 +40,21 @@ export default function PlaceCard({
   if (compact) {
     return (
       <button
-        onClick={handleClick}
+        onClick={onClick}
         className={`group w-full rounded-lg border px-3 py-2 text-left transition-all ${
-          isBuildMode && isInBuildList
-            ? "border-[var(--color-amber)]/40 bg-[var(--color-amber-dim)]"
-            : isSelected
-              ? "border-[var(--color-amber)]/50 bg-[var(--color-amber-dim)]"
-              : "border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] hover:border-[var(--color-sidebar-muted)]/50 hover:bg-[var(--color-sidebar-surface)]/80"
+          isSelected
+            ? "border-[var(--color-amber)]/50 bg-[var(--color-amber-dim)]"
+            : "border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] hover:border-[var(--color-sidebar-muted)]/50 hover:bg-[var(--color-sidebar-surface)]/80"
         }`}
       >
         <div className="flex items-center justify-between gap-2">
           {isBuildMode && (
             <span
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+              onClick={handleToggle}
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors cursor-pointer ${
                 isInBuildList
                   ? "border-[var(--color-amber)] bg-[var(--color-amber)] text-white"
-                  : "border-[var(--color-sidebar-muted)]/40"
+                  : "border-[var(--color-sidebar-muted)]/40 hover:border-[var(--color-sidebar-muted)]"
               }`}
             >
               {isInBuildList && (
@@ -134,22 +132,21 @@ export default function PlaceCard({
 
   return (
     <button
-      onClick={handleClick}
+      onClick={onClick}
       className={`group w-full rounded-lg border p-3 text-left transition-all ${
-        isBuildMode && isInBuildList
-          ? "border-[var(--color-amber)]/40 bg-[var(--color-amber-dim)]"
-          : isSelected
-            ? "border-[var(--color-amber)]/50 bg-[var(--color-amber-dim)]"
-            : "border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] hover:border-[var(--color-sidebar-muted)]/50 hover:bg-[var(--color-sidebar-surface)]/80"
+        isSelected
+          ? "border-[var(--color-amber)]/50 bg-[var(--color-amber-dim)]"
+          : "border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] hover:border-[var(--color-sidebar-muted)]/50 hover:bg-[var(--color-sidebar-surface)]/80"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
         {isBuildMode && (
           <span
-            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+            onClick={handleToggle}
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors cursor-pointer ${
               isInBuildList
                 ? "border-[var(--color-amber)] bg-[var(--color-amber)] text-white"
-                : "border-[var(--color-sidebar-muted)]/40"
+                : "border-[var(--color-sidebar-muted)]/40 hover:border-[var(--color-sidebar-muted)]"
             }`}
           >
             {isInBuildList && (

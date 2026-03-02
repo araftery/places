@@ -40,6 +40,8 @@ interface MobileBottomSheetProps {
   onRenameList?: (id: number, name: string) => Promise<void>;
   onDeleteList?: (id: number) => Promise<void>;
   onTogglePlaceInList?: (placeId: number, listId: number) => Promise<void>;
+  viewingListId?: number | null;
+  onViewingListIdChange?: (id: number | null) => void;
 }
 
 export default function MobileBottomSheet({
@@ -72,6 +74,8 @@ export default function MobileBottomSheet({
   onRenameList,
   onDeleteList,
   onTogglePlaceInList,
+  viewingListId,
+  onViewingListIdChange,
 }: MobileBottomSheetProps) {
   const [expanded, setExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -211,8 +215,7 @@ export default function MobileBottomSheet({
       </div>
 
       {/* Tab bar */}
-      {(hasDiscover || lists.length > 0) && (
-        <div className="flex gap-4 px-4 pb-2">
+      <div className="flex gap-4 px-4 pb-2">
           <button
             onClick={() => onActiveTabChange("places")}
             className={`pb-1 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
@@ -235,20 +238,17 @@ export default function MobileBottomSheet({
               Discover
             </button>
           )}
-          {lists.length > 0 && (
-            <button
-              onClick={() => onActiveTabChange("lists")}
-              className={`pb-1 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                activeTab === "lists"
-                  ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
-                  : "text-[var(--color-sidebar-muted)]"
-              }`}
-            >
-              Lists
-            </button>
-          )}
+          <button
+            onClick={() => onActiveTabChange("lists")}
+            className={`pb-1 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+              activeTab === "lists"
+                ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
+                : "text-[var(--color-sidebar-muted)]"
+            }`}
+          >
+            Lists
+          </button>
         </div>
-      )}
 
       {/* Content area — relative container for drawer overlay */}
       <div className="relative flex-1 overflow-hidden">
@@ -283,6 +283,8 @@ export default function MobileBottomSheet({
               onSelectPlace={onSelectPlace}
               onBuildingListIdChange={onBuildingListIdChange}
               travelTimes={travelTimes}
+              selectedListId={viewingListId ?? null}
+              onSelectedListIdChange={onViewingListIdChange}
             />
           </div>
         )}

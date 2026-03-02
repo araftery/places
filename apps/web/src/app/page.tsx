@@ -35,6 +35,7 @@ export default function Home() {
   const [lists, setLists] = useState<List[]>([]);
   const [activeTab, setActiveTab] = useState<"places" | "discover" | "lists">("places");
   const [buildingListId, setBuildingListIdRaw] = useState<number | null>(null);
+  const [viewingListId, setViewingListId] = useState<number | null>(null);
 
   const setBuildingListId = useCallback((id: number | null) => {
     setBuildingListIdRaw(id);
@@ -190,12 +191,6 @@ export default function Home() {
     }
   }, [selectedCity, activeTab]);
 
-  // Auto-reset from lists tab if all lists deleted
-  useEffect(() => {
-    if (activeTab === "lists" && lists.length === 0) {
-      setActiveTab("places");
-    }
-  }, [activeTab, lists.length]);
 
   // Clear discover pins when switching to places tab
   const tabMountedRef = useRef(false);
@@ -207,6 +202,9 @@ export default function Home() {
     if (activeTab !== "discover") {
       setDiscoverPins([]);
       setSelectedDiscoverIndex(null);
+    }
+    if (activeTab !== "lists") {
+      setViewingListId(null);
     }
   }, [activeTab]);
 
@@ -221,6 +219,14 @@ export default function Home() {
     }
     return result;
   }, [places, selectedCityId, filters, isoGeoJson]);
+
+  // When viewing a list (not in build mode), only show those places on the map
+  const mapPlaces = useMemo(() => {
+    if (activeTab === "lists" && viewingListId && !buildingListId) {
+      return filteredPlaces.filter((p) => p.listIds?.includes(viewingListId));
+    }
+    return filteredPlaces;
+  }, [filteredPlaces, activeTab, viewingListId, buildingListId]);
 
   const travelTimes = useMemo(() => {
     const map = new Map<number, TravelTimeBand>();
@@ -540,13 +546,15 @@ export default function Home() {
           onRenameList={handleRenameList}
           onDeleteList={handleDeleteList}
           onTogglePlaceInList={handleTogglePlaceInList}
+          viewingListId={viewingListId}
+          onViewingListIdChange={setViewingListId}
         />
       </div>
 
       {/* Map */}
       <div className="relative flex-1">
         <MapView
-          places={filteredPlaces}
+          places={mapPlaces}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
           onMapClick={handleMapClick}
@@ -656,6 +664,8 @@ export default function Home() {
           onRenameList={handleRenameList}
           onDeleteList={handleDeleteList}
           onTogglePlaceInList={handleTogglePlaceInList}
+          viewingListId={viewingListId}
+          onViewingListIdChange={setViewingListId}
         />
       </div>
 

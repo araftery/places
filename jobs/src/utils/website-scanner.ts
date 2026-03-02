@@ -218,8 +218,16 @@ export async function scanWebsiteForReservation(
     });
     const page = await context.newPage();
 
-    // Load homepage
-    await page.goto(websiteUrl, { waitUntil: "domcontentloaded", timeout: 15_000 });
+    // Load homepage (continue with partial content on timeout)
+    try {
+      await page.goto(websiteUrl, { waitUntil: "domcontentloaded", timeout: 15_000 });
+    } catch (err: any) {
+      if (err.name === "TimeoutError" || err.message?.includes("Timeout")) {
+        result.signals.push(`timeout_partial: ${websiteUrl}`);
+      } else {
+        throw err;
+      }
+    }
     homepageText = await extractVisibleText(page);
     homepageLinks = await extractLinks(page);
     homepageEmbeds = await extractEmbeds(page);
@@ -230,12 +238,19 @@ export async function scanWebsiteForReservation(
     if (reservationPageUrl) {
       try {
         await page.goto(reservationPageUrl, { waitUntil: "domcontentloaded", timeout: 15_000 });
+      } catch (err: any) {
+        if (err.name === "TimeoutError" || err.message?.includes("Timeout")) {
+          result.signals.push(`timeout_partial: ${reservationPageUrl}`);
+        } else {
+          result.signals.push(`follow_failed: ${reservationPageUrl} - ${err.message}`);
+          reservationPageUrl = null;
+        }
+      }
+      if (reservationPageUrl) {
         reservationPageText = await extractVisibleText(page);
         reservationPageLinks = await extractLinks(page);
         reservationPageEmbeds = await extractEmbeds(page);
         result.signals.push(`followed: ${reservationPageUrl}`);
-      } catch (err: any) {
-        result.signals.push(`follow_failed: ${reservationPageUrl} - ${err.message}`);
       }
     }
   } catch (err: any) {
