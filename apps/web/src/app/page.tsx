@@ -17,6 +17,11 @@ import IsochroneControl, {
 import MobileBottomSheet from "@/components/MobileBottomSheet";
 import { Place, Tag, City, Cuisine, List } from "@/lib/types";
 import { isInIsochrone, getTravelTimeBand, type TravelTimeBand } from "@/lib/geo";
+import {
+  CITIES_WITH_NEIGHBORHOODS,
+  getCitySlug,
+  fetchNeighborhoodGeoJson,
+} from "@/lib/neighborhoods";
 export type { TravelTimeBand } from "@/lib/geo";
 
 const MapView = dynamic(() => import("@/components/Map"), { ssr: false });
@@ -66,6 +71,10 @@ export default function Home() {
     useState<GeoJSON.FeatureCollection | null>(null);
   const [isoLoading, setIsoLoading] = useState(false);
 
+  // Neighborhood overlay state
+  const [showNeighborhoods, setShowNeighborhoods] = useState(true);
+  const [neighborhoodGeoJson, setNeighborhoodGeoJson] =
+    useState<GeoJSON.FeatureCollection | null>(null);
 
   const fetchPlaces = useCallback(async () => {
     const res = await fetch("/api/places");
@@ -190,6 +199,20 @@ export default function Home() {
       setActiveTab("places");
     }
   }, [selectedCity, activeTab]);
+
+  const cityHasNeighborhoods = selectedCity
+    ? CITIES_WITH_NEIGHBORHOODS.includes(getCitySlug(selectedCity.name))
+    : false;
+
+  // Fetch neighborhood GeoJSON when toggled on + city changes
+  useEffect(() => {
+    if (!showNeighborhoods || !selectedCity) {
+      setNeighborhoodGeoJson(null);
+      return;
+    }
+    const slug = getCitySlug(selectedCity.name);
+    fetchNeighborhoodGeoJson(slug).then(setNeighborhoodGeoJson);
+  }, [showNeighborhoods, selectedCity]);
 
 
   // Clear discover pins when switching to places tab
@@ -574,20 +597,42 @@ export default function Home() {
           onSelectDiscoverPin={handleSelectDiscoverIndex}
           buildingListId={buildingListId}
           onTogglePlaceInList={handleTogglePlaceInList}
+          neighborhoodGeoJson={neighborhoodGeoJson}
         />
 
-        {/* Isochrone controls */}
-        <div className="absolute left-3 top-3 z-10">
-          <IsochroneControl
-            settings={isoSettings}
-            onChange={setIsoSettings}
-            loading={isoLoading}
-            onFetch={fetchIsochrone}
-            onClear={clearIsochrone}
-            onUseLocation={useMyLocation}
-            hasIsochrone={!!isoGeoJson}
-            mapCenter={mapCenter}
-          />
+        {/* Map overlay controls */}
+        <div className="absolute left-3 top-3 z-10 flex flex-col gap-2">
+          <div className="flex items-start gap-2">
+            <IsochroneControl
+              settings={isoSettings}
+              onChange={setIsoSettings}
+              loading={isoLoading}
+              onFetch={fetchIsochrone}
+              onClear={clearIsochrone}
+              onUseLocation={useMyLocation}
+              hasIsochrone={!!isoGeoJson}
+              mapCenter={mapCenter}
+            />
+            {cityHasNeighborhoods && (
+              <button
+                onClick={() => setShowNeighborhoods((v) => !v)}
+                title="Toggle neighborhoods"
+                className={`flex h-[38px] w-[38px] items-center justify-center rounded-lg transition-colors ${
+                  showNeighborhoods
+                    ? "bg-[var(--color-amber)] text-white"
+                    : "border border-[#e0d6ca] bg-[var(--color-parchment)] text-[var(--color-ink-muted)] hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
+                }`}
+                style={{ boxShadow: "var(--shadow-float)" }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Mobile: Add FAB */}

@@ -54,6 +54,7 @@ interface MapProps {
   onSelectDiscoverPin?: (index: number | null) => void;
   buildingListId?: number | null;
   onTogglePlaceInList?: (placeId: number, listId: number) => Promise<void>;
+  neighborhoodGeoJson?: GeoJSON.FeatureCollection | null;
 }
 
 const INTERACTIVE_LAYER_IDS = ["place-dots"];
@@ -75,6 +76,7 @@ export default function Map({
   onSelectDiscoverPin,
   buildingListId,
   onTogglePlaceInList,
+  neighborhoodGeoJson,
 }: MapProps) {
   const mapRef = useRef<MapRef>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -156,6 +158,38 @@ export default function Map({
     for (const p of places) lookup[p.id] = p;
     return lookup;
   }, [places]);
+
+  // Compute label points at polygon centroids for neighborhood names
+  const neighborhoodLabelsGeoJson = useMemo((): GeoJSON.FeatureCollection | null => {
+    if (!neighborhoodGeoJson) return null;
+    return {
+      type: "FeatureCollection",
+      features: neighborhoodGeoJson.features.map((f) => {
+        const geom = f.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon;
+        // Use bbox center as a simple centroid
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const rings = geom.type === "Polygon"
+          ? geom.coordinates
+          : geom.coordinates.flat();
+        for (const ring of rings) {
+          for (const [x, y] of ring as [number, number][]) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+        return {
+          type: "Feature" as const,
+          properties: { name: f.properties?.name ?? "" },
+          geometry: {
+            type: "Point" as const,
+            coordinates: [(minX + maxX) / 2, (minY + maxY) / 2],
+          },
+        };
+      }),
+    };
+  }, [neighborhoodGeoJson]);
 
   const handleClick = useCallback(
     (e: MapMouseEvent) => {
@@ -327,6 +361,57 @@ export default function Map({
           <Layer {...shadowLayer} />
           <Layer {...dotLayer} />
           <Layer {...selectedRingLayer} />
+        </Source>
+      )}
+
+      {/* Neighborhood boundaries — below everything */}
+      {neighborhoodGeoJson && (
+        <Source id="neighborhood-boundaries" type="geojson" data={neighborhoodGeoJson}>
+          <Layer
+            id="neighborhood-fill"
+            type="fill"
+            {...(showPlaces ? { beforeId: "place-shadows" } : {})}
+            paint={{
+              "fill-color": "#8a7e72",
+              "fill-opacity": 0.07,
+            }}
+          />
+          <Layer
+            id="neighborhood-line"
+            type="line"
+            {...(showPlaces ? { beforeId: "place-shadows" } : {})}
+            paint={{
+              "line-color": "#8a7e72",
+              "line-width": 1.5,
+              "line-opacity": 0.6,
+              "line-dasharray": [4, 3],
+            }}
+          />
+        </Source>
+      )}
+      {neighborhoodLabelsGeoJson && neighborhoodGeoJson && (
+        <Source id="neighborhood-labels" type="geojson" data={neighborhoodLabelsGeoJson}>
+          <Layer
+            id="neighborhood-label"
+            type="symbol"
+            {...(showPlaces ? { beforeId: "place-shadows" } : {})}
+            layout={{
+              "text-field": ["get", "name"],
+              "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+              "text-size": ["interpolate", ["linear"], ["zoom"], 10, 9, 14, 12],
+              "text-transform": "uppercase",
+              "text-letter-spacing": 0.08,
+              "text-max-width": 8,
+              "text-allow-overlap": false,
+              "text-padding": 4,
+            }}
+            paint={{
+              "text-color": "#8a7e72",
+              "text-halo-color": "#faf6f1",
+              "text-halo-width": 1.5,
+              "text-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0, 11.5, 0.75, 13, 1],
+            }}
+          />
         </Source>
       )}
 

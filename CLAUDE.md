@@ -195,6 +195,26 @@ Shared helper `mapGoogleDetailsToPlace()` in `apps/web/src/lib/google-places.ts`
 - **Sticky guide header**: The "< Guides" back button in DiscoverPanel uses `sticky -top-3` with `bg-[var(--color-sidebar-bg)]` to stay visible while scrolling through restaurants.
 - **Mobile map behavior**: Popups/tooltips are not rendered on mobile (detected via `isMobile` state in Map component). FlyTo padding varies by context: 80% for discover panel (expanded at `top-[20vh]`), 50% for PlaceDetail (`max-h-[70vh]`), 25% for collapsed bottom sheet.
 
+## Neighborhood Boundary Overlays
+
+Togglable neighborhood boundary lines + labels on the map. On by default. Icon-only toggle button sits next to the "Nearby" isochrone control.
+
+### Data Pipeline
+- **Source**: Static GeoJSON files at `apps/web/public/neighborhoods/{city-slug}.json`
+- **Prep script**: `scripts/process-neighborhoods.ts` — downloads raw GeoJSON from city open data portals, filters to residential areas, simplifies geometry (Douglas-Peucker), outputs `{ name }` features
+- **Adding a city**: Add an entry to the `CITY_SOURCES` array in `process-neighborhoods.ts` (URL, name property, optional filter/transform), add slug to `CITIES_WITH_NEIGHBORHOODS` in `apps/web/src/lib/neighborhoods.ts`, run the script
+
+### Key Files
+- **`apps/web/src/lib/neighborhoods.ts`** — `CITIES_WITH_NEIGHBORHOODS` allowlist, `getCitySlug()`, `fetchNeighborhoodGeoJson()` with module-level `Map` cache
+- **`apps/web/src/components/Map.tsx`** — Three Mapbox GL layers (fill, line, symbol) rendered with `beforeId="place-shadows"`. Labels placed at bbox centroids via `useMemo`. Not in `INTERACTIVE_LAYER_IDS` (no click handling)
+- **`apps/web/src/app/page.tsx`** — `showNeighborhoods` state (default `true`), `neighborhoodGeoJson` state, fetch effect on city/toggle change, `cityHasNeighborhoods` derived from allowlist, icon toggle button
+
+### Behaviors
+- Toggle button only shows for cities in the allowlist
+- Layers persist in discover mode (useful context); `beforeId` conditionally applied only when `showPlaces` is true
+- Module-level cache makes re-toggle instant
+- Switching cities clears and re-fetches GeoJSON
+
 ## Environment Variables
 
 ```
