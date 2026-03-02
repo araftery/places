@@ -134,6 +134,52 @@ export const PLACE_TYPES = [
   { value: "other", label: "Other" },
 ] as const;
 
+export type PlaceTypeCategory =
+  | "sitdown_dining"
+  | "quick_eats"
+  | "cocktail_wine"
+  | "casual_bars"
+  | "cafes_bakeries"
+  | "other";
+
+export const PLACE_TYPE_CATEGORY: Record<string, PlaceTypeCategory> = {
+  fine_dining: "sitdown_dining",
+  casual_dining: "sitdown_dining",
+  fast_casual: "quick_eats",
+  deli: "quick_eats",
+  food_truck: "quick_eats",
+  cocktail_bar: "cocktail_wine",
+  wine_bar: "cocktail_wine",
+  dive_bar: "casual_bars",
+  sports_bar: "casual_bars",
+  pub: "casual_bars",
+  brewery: "casual_bars",
+  cafe: "cafes_bakeries",
+  bakery: "cafes_bakeries",
+  night_club: "other",
+  retail: "other",
+  tourist_site: "other",
+  other: "other",
+};
+
+export const CATEGORY_COLORS: Record<PlaceTypeCategory, string> = {
+  sitdown_dining: "#d4897a",
+  quick_eats: "#d4b87a",
+  cocktail_wine: "#b08faa",
+  casual_bars: "#82b5ad",
+  cafes_bakeries: "#daa66a",
+  other: "#a8a098",
+};
+
+export const CATEGORY_STROKE_COLORS: Record<PlaceTypeCategory, string> = {
+  sitdown_dining: "#a35843",
+  quick_eats: "#a38543",
+  cocktail_wine: "#7a5874",
+  casual_bars: "#4d7a72",
+  cafes_bakeries: "#a87430",
+  other: "#736b62",
+};
+
 export const GOOGLE_TO_DEFAULT_PLACE_TYPE: Record<string, string> = {
   restaurant: "casual_dining",
   bar: "dive_bar",
