@@ -23,6 +23,7 @@ export interface City {
   lng: number;
   providers: string[];
   infatuationSlug: string | null;
+  michelinCitySlug: string | null;
 }
 
 export interface PlaceRating {

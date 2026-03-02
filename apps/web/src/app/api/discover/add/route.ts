@@ -23,7 +23,7 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
 }
 
 export async function POST(request: NextRequest) {
-  const { name, lat, lng, cityId, source, reviewSlug } = await request.json();
+  const { name, lat, lng, cityId, source, reviewSlug, michelinObjectId, michelinStars, michelinDistinction } = await request.json();
 
   if (!name || lat == null || lng == null) {
     return NextResponse.json(
@@ -145,6 +145,20 @@ export async function POST(request: NextRequest) {
       lastFetched: new Date(),
     }).returning();
     ratings.push(infatuationRating);
+  }
+
+  // 7b. Save Michelin rating if provided (from Michelin discover)
+  if (michelinObjectId) {
+    const [michelinRating] = await db.insert(placeRatings).values({
+      placeId: newPlace.id,
+      source: "michelin",
+      externalId: michelinObjectId,
+      rating: michelinStars > 0 ? michelinStars : null,
+      ratingMax: michelinStars > 0 ? 3 : null,
+      notes: michelinDistinction || null,
+      lastFetched: new Date(),
+    }).returning();
+    ratings.push(michelinRating);
   }
 
   // 8. Trigger coverage scraping

@@ -14,17 +14,25 @@ export function formatCount(n: number): string {
   return String(n);
 }
 
-/** Get the best editorial blurb from ratings (NYT > Infatuation, must be >30 chars) */
+/** Get the best editorial blurb from ratings (NYT > Michelin > Infatuation, must be >30 chars) */
 export function getBestBlurb(
   ratings: PlaceRating[]
 ): { text: string; source: string; url: string | null } | null {
-  const sources = ["nyt", "infatuation"];
+  const sourceLabels: Record<string, string> = {
+    nyt: "The New York Times",
+    michelin: "Michelin Guide",
+    infatuation: "The Infatuation",
+  };
+  const sources = ["nyt", "michelin", "infatuation"];
   for (const src of sources) {
     const r = ratings.find((r) => r.source === src);
-    if (r?.notes && r.notes.length > 30) {
+    if (!r?.notes) continue;
+    // For michelin, the description is after the distinction label (separated by \n\n)
+    const text = src === "michelin" ? r.notes.split("\n\n").slice(1).join("\n\n") : r.notes;
+    if (text && text.length > 30) {
       return {
-        text: r.notes,
-        source: src === "nyt" ? "The New York Times" : "The Infatuation",
+        text,
+        source: sourceLabels[src] || src,
         url: r.ratingUrl,
       };
     }

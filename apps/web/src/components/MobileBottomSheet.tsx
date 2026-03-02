@@ -133,7 +133,7 @@ export default function MobileBottomSheet({
     () => (selectedCityId ? cities.find((c) => c.id === selectedCityId) : null),
     [selectedCityId, cities]
   );
-  const hasDiscover = !!selectedCity?.infatuationSlug;
+  const hasDiscover = !!selectedCity?.infatuationSlug || !!selectedCity?.michelinCitySlug;
 
   const activeFilterCount =
     (filters.showArchived ? 1 : 0) +
@@ -253,10 +253,11 @@ export default function MobileBottomSheet({
       {/* Content area — relative container for drawer overlay */}
       <div className="relative flex-1 overflow-hidden">
         {/* Discover Panel */}
-        {activeTab === "discover" && hasDiscover && selectedCity?.infatuationSlug && onDiscoverPinsChange && (
+        {activeTab === "discover" && hasDiscover && selectedCity && onDiscoverPinsChange && (
           <div className="h-full overflow-y-auto py-2 sidebar-scroll">
             <DiscoverPanel
-              citySlug={selectedCity.infatuationSlug}
+              infatuationSlug={selectedCity.infatuationSlug}
+              michelinCitySlug={selectedCity.michelinCitySlug}
               cityId={selectedCity.id}
               existingPlaces={allPlaces || places}
               onPlaceAdded={onPlaceAdded || (() => { /* noop */ })}

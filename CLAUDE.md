@@ -36,7 +36,7 @@ Shared Drizzle ORM schema and lazy-proxy DB connection. Used by both `@places/we
 
 Standalone API clients for scraping/querying restaurant review sources. Each client exposes `search()` and `lookup()` methods returning a common `SearchResult`/`LookupResult` shape. All clients support optional `proxyUrl` config for routing through Oxylabs.
 
-Clients: **Google Places**, **The Infatuation**, **Beli**, **NYT Cooking/Restaurant Reviews**, **Resy**, **OpenTable**
+Clients: **Google Places**, **The Infatuation**, **Michelin Guide**, **Beli**, **NYT Cooking/Restaurant Reviews**, **Resy**, **OpenTable**
 
 Also includes a **Website Scanner** utility (`packages/clients/src/website-scanner/index.ts`) — not a traditional client but a `scanWebsiteForReservation(url, options)` function that:
 1. Uses **Playwright** (headless Chromium) to load a restaurant's website with full JS rendering, optionally proxied through **Oxylabs**
@@ -55,6 +55,7 @@ Async job system for multi-source rating scraping and scheduled audits:
 - `audit-infatuation` — monthly Infatuation re-scrape
 - `audit-beli` — biweekly Beli re-scrape
 - `audit-nyt` — monthly NYT re-scrape
+- Michelin is included in `initiate-coverage` (30-day audit cycle, skipped if city has no `michelinCitySlug`)
 
 ## Tech Stack
 
@@ -113,34 +114,78 @@ For other packages:
 - **Map pins (native layers)**: My Places render as GPU-accelerated Mapbox GL circle layers (not React Markers) for performance at scale. A GeoJSON FeatureCollection is built via `useMemo` from `places` with properties like `categoryColor`, `isSelected`, `isBuildMode`. Layers: `place-shadows` (blurred shadow beneath), `place-dots` (filled circles with white stroke), `place-selected-ring` (amber ring). Click handling uses `interactiveLayerIds` + feature detection in the `onClick` handler. Isochrone layers use `beforeId="place-shadows"` to render below dots.
 - **Place type categories**: 17 place types map to 6 categories (`PLACE_TYPE_CATEGORY` in `types.ts`), each with a pastel color (`CATEGORY_COLORS`). Categories: sitdown_dining (terracotta), quick_eats (gold), cocktail_wine (plum), casual_bars (teal), cafes_bakeries (amber), other (taupe). Circle radius scales with zoom level via Mapbox `interpolate` expressions.
 
-## Discover Tab (Infatuation Guide Browser)
+## Discover Tab
 
-Browse Infatuation restaurant guides (Hitlist, New Openings, Top 25, etc.) per city and one-click add restaurants to your places list. Only available when the selected city has an `infatuationSlug` (stored on `cities` table).
+Browse restaurant guides and directories per city and one-click add to your places list. Supports two sources: **Infatuation** (editorial guides) and **Michelin Guide** (flat directory with distinction filters). Available when the selected city has `infatuationSlug` and/or `michelinCitySlug` set on the `cities` table.
 
-### Infatuation Client Methods
+### Source Switcher
 
-In `packages/clients/src/infatuation/index.ts`:
+When a city has both sources, `DiscoverPanel` renders a segmented control (Infatuation / Michelin) at the top. `DiscoverPanel` accepts `infatuationSlug: string | null` and `michelinCitySlug: string | null` props (not a single `citySlug`). The Infatuation view is rendered by the internal `InfatuationDiscoverView` component; the Michelin view by `MichelinDiscoverView`.
+
+### Infatuation
+
+Browses Infatuation guides (Hitlist, New Openings, Top 25, etc.). Guide list → guide detail drill-down.
+
+**Client** (`packages/clients/src/infatuation/index.ts`):
 - `listGuides(canonicalPath)` — queries Infatuation PSS GraphQL for all guides in a city
 - `getGuideContent(slug)` — queries Infatuation Contentful GraphQL for a guide's restaurants (handles both `Caption` and `CaptionGroup` content types)
 - Types: `GuideListItem`, `GuideRestaurant`, `GuideVenue`, `GuideContent`
 
+### Michelin Guide
+
+Browses the Michelin restaurant directory filtered by distinction level. No guides — flat list with filter chips.
+
+**Client** (`packages/clients/src/michelin/index.ts`):
+- Uses **Algolia** behind the scenes (App ID: `8NVHRD7ONV`, index: `prod-restaurants-en`)
+- Requires `Referer: https://guide.michelin.com/` and `Origin: https://guide.michelin.com` headers
+- `listRestaurants(citySlug, options?)` — paginated city browse with optional `distinction` filter
+- `search(name, options?)` — geo-proximity search (`aroundLatLng` + `aroundRadius: 2000`) for initiate-coverage matching
+- `lookup(objectID)` — single restaurant fetch
+- Types: `MichelinRestaurant`, `MichelinListResult`, `MichelinClient`
+- **Stars are derived from `michelin_award` string** (not the numeric `stars` field which is unreliable). Award values: `THREE_STARS`, `TWO_STARS`, `ONE_STAR`, `BIB_GOURMAND`, `selected`
+- Zod schemas use `.nullable().optional()` on most fields since the Algolia API returns `null` liberally
+- Price mapping: affordable=1, mid-range=2, premium=3, luxury=4
+
+**City slugs** (`cities.michelinCitySlug`): Michelin Algolia city slugs vary in format — some are plain (`new-york`, `paris`, `barcelona`), some have numeric suffixes (`austin_2958315`, `boston_2914838`). Use `scripts/_list-michelin-cities.ts` to query all slugs from Algolia via facet search, or search for a specific restaurant in a city to discover its `city.slug` value.
+
+**Components**:
+- **`MichelinDiscoverView`** (`apps/web/src/components/MichelinDiscoverView.tsx`) — distinction filter chips (All / 3 Stars / 2 Stars / 1 Star / Bib Gourmand / Selected), paginated restaurant list with "Load more" button, isochrone filtering, pin ↔ card sync
+- **`MichelinRestaurantCard`** (`apps/web/src/components/MichelinRestaurantCard.tsx`) — card with Michelin clover/star icons (red `#c41e24`), Bib Gourmand icon, green star icon, cuisine tags, price label. Same add/in-list button states as Infatuation card
+
+**PlaceDetail display** (`PlaceDetail.tsx`):
+- `michelin` is in `SOURCE_LABELS` and `RATING_SOURCE_ORDER` (after google, before nyt)
+- Custom `MichelinRatingDisplay` component renders clover SVG icons for stars (1-3 in Michelin red), Bib Gourmand icon, "Selected" text, and green star clover for Green Star (parsed from `notes` field)
+
+**Provider** (`jobs/src/providers/michelin.ts`):
+- `scrapeMichelin(place, existingExternalId?, sessionId?)` → `ScrapeResult`
+- Searches by name near lat/lng, takes best match, looks up full details
+- Rating: `ratingMax: 3` for starred, `null` for Bib Gourmand/Selected
+- Notes field stores distinction label (e.g. "2 Michelin Stars", "Bib Gourmand, Green Star")
+
+**Backfill script** (`scripts/backfill-michelin.ts`):
+- One-time script to pull all Michelin restaurants for a city and match against existing places by name + proximity (200m)
+- Upserts michelin ratings and audit records
+- Usage: `pnpm tsx scripts/backfill-michelin.ts [--city-slug new-york] [--dry-run]`
+
 ### API Routes
 
-- `GET /api/discover/guides?citySlug=/new-york` — lists guides for a city
-- `GET /api/discover/guides/[slug]` — fetches guide content (restaurants)
-- `POST /api/discover/add` — auto-matches Infatuation venue to Google Places, saves via same logic as `POST /api/places`. Request: `{ name, lat, lng, cityId, source }`. Returns `{ matched, duplicate?, place? }`
+- `GET /api/discover/guides?citySlug=/new-york` — lists Infatuation guides for a city
+- `GET /api/discover/guides/[slug]` — fetches Infatuation guide content (restaurants)
+- `GET /api/discover/michelin?citySlug=...&distinction=...&page=0` — lists Michelin restaurants for a city
+- `POST /api/discover/add` — auto-matches venue to Google Places, saves place. Accepts both Infatuation (`reviewSlug`) and Michelin (`michelinObjectId`, `michelinStars`, `michelinDistinction`) data
 
 Shared helper `mapGoogleDetailsToPlace()` in `apps/web/src/lib/google-places.ts` extracts address parsing + cuisine derivation logic used by both `/api/search` and `/api/discover/add`.
 
 ### Components
 
-- **`DiscoverPanel`** (`apps/web/src/components/DiscoverPanel.tsx`) — main browser with guide list → guide detail views. Auto-selects "New Openings" (if available) or "Hit List" on load. New Openings sorted newest-first, limited to 75 restaurants. Pushes `DiscoverPin[]` to the map via `onDiscoverPinsChange`.
-- **`DiscoverRestaurantCard`** (`apps/web/src/components/DiscoverRestaurantCard.tsx`) — restaurant card with add button states: idle → adding → added/duplicate/no-match.
+- **`DiscoverPanel`** (`apps/web/src/components/DiscoverPanel.tsx`) — top-level wrapper with source switcher + delegates to `InfatuationDiscoverView` or `MichelinDiscoverView`. Exports `DiscoverPin` type.
+- **`DiscoverRestaurantCard`** (`apps/web/src/components/DiscoverRestaurantCard.tsx`) — Infatuation restaurant card
+- **`MichelinDiscoverView`** / **`MichelinRestaurantCard`** — Michelin equivalents
 
-### Key Behaviors
+### Shared Discover Behaviors
 
 - **Map pins**: When Discover tab is active, My Places native layers are hidden (`showPlaces` flag). Discover pins are React Markers (small filled circles with white stroke) — amber for new restaurants, slate-blue for already-in-list.
-- **"Already in list" detection**: Matches by Infatuation review slug in `place_ratings.externalId` (source: `"infatuation"`), with name fallback. Uses slate-blue accent color in both map pins and sidebar cards.
+- **"Already in list" detection**: Infatuation matches by review slug in `place_ratings.externalId` (source: `"infatuation"`). Michelin matches by objectID in `place_ratings.externalId` (source: `"michelin"`). Uses slate-blue accent color in both map pins and sidebar cards.
 - **Isochrone integration**: Discover restaurants filter to those within the isochrone polygon. Travel time bands display on cards. Sort-by-nearest auto-activates when isochrone is active.
 - **Auto-open PlaceDetail**: Clicking an in-list card or in-list map pin opens the matching place's detail panel. Newly added places auto-open after the places list refreshes (via `pendingOpenPlaceId` state + effect). `DiscoverPin` includes `matchedPlaceId` for in-list pins so the map click can resolve the Place without going through DiscoverPanel.
 - **Tab system**: `activeTab` state is lifted to `page.tsx` and passed as props to both `Sidebar` and `MobileBottomSheet`. This ensures tab state survives across PlaceDetail open/close. Switching to "My Places" clears discover pins (via effect in `page.tsx` with `tabMountedRef` guard to skip initial mount).
@@ -176,7 +221,9 @@ GEMINI_API_KEY            # Google Gemini API key (website scanner)
 
 ## Database
 
-Schema is in `packages/db/src/schema.ts`. Six tables: `cities`, `places`, `tags`, `place_tags` (junction), `place_ratings`, `place_audits`. After schema changes, run `pnpm db:generate` then `pnpm db:migrate` (or `db:push` for quick iteration). Drizzle config points to `../../packages/db/src/schema.ts`.
+Schema is in `packages/db/src/schema.ts`. Tables: `cities`, `places`, `tags`, `place_tags` (junction), `place_ratings`, `place_audits`, `cuisines`, `place_cuisines`, `lists`, `place_lists`. After schema changes, run `pnpm db:generate` then `pnpm db:migrate` (or `db:push` for quick iteration). Drizzle config points to `../../packages/db/src/schema.ts`.
+
+Cities have `infatuationSlug` and `michelinCitySlug` columns that control which Discover sources are available and whether initiate-coverage includes those providers.
 
 ## Visual Design
 

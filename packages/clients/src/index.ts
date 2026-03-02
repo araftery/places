@@ -31,6 +31,9 @@ export type {
   SevenRoomsOpeningWindow,
 } from "./sevenrooms/index";
 
+export { createMichelinClient } from "./michelin/index";
+export type { MichelinClient, MichelinClientConfig, MichelinRestaurant, MichelinListResult } from "./michelin/index";
+
 export { createFetch } from "./proxy";
 export type { ProxyConfig } from "./proxy";
 

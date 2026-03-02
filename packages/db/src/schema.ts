@@ -23,6 +23,7 @@ export const cities = pgTable(
     lng: real("lng").notNull(),
     providers: jsonb("providers").$type<string[]>().notNull().default(["google"]),
     infatuationSlug: text("infatuation_slug"),
+    michelinCitySlug: text("michelin_city_slug"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [uniqueIndex("cities_name_country_idx").on(table.name, table.country)]

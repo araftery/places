@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import DiscoverRestaurantCard from "./DiscoverRestaurantCard";
+import MichelinDiscoverView from "./MichelinDiscoverView";
 import type { GuideListItem, GuideContent, GuideRestaurant } from "@places/clients/infatuation";
 import type { Place } from "@/lib/types";
 import { isInIsochrone, getTravelTimeBand, type TravelTimeBand } from "@/lib/geo";
@@ -15,8 +16,11 @@ export interface DiscoverPin {
   matchedPlaceId: number | null;
 }
 
+type DiscoverSource = "infatuation" | "michelin";
+
 interface DiscoverPanelProps {
-  citySlug: string;
+  infatuationSlug: string | null;
+  michelinCitySlug: string | null;
   cityId: number;
   existingPlaces: Place[];
   onPlaceAdded: (place: Place) => void;
@@ -30,7 +34,8 @@ interface DiscoverPanelProps {
 type AddStatus = "idle" | "adding" | "added" | "duplicate" | "no-match";
 
 export default function DiscoverPanel({
-  citySlug,
+  infatuationSlug,
+  michelinCitySlug,
   cityId,
   existingPlaces,
   onPlaceAdded,
@@ -40,6 +45,113 @@ export default function DiscoverPanel({
   isoGeoJson,
   onOpenPlace,
 }: DiscoverPanelProps) {
+  const hasBoth = !!infatuationSlug && !!michelinCitySlug;
+  const defaultSource: DiscoverSource = infatuationSlug ? "infatuation" : "michelin";
+  const [activeSource, setActiveSource] = useState<DiscoverSource>(defaultSource);
+
+  // Reset source when slugs change
+  useEffect(() => {
+    if (!infatuationSlug && activeSource === "infatuation") {
+      setActiveSource("michelin");
+    }
+    if (!michelinCitySlug && activeSource === "michelin") {
+      setActiveSource("infatuation");
+    }
+  }, [infatuationSlug, michelinCitySlug]);
+
+  // Michelin source
+  if (activeSource === "michelin" && michelinCitySlug) {
+    return (
+      <div className="flex flex-col">
+        {hasBoth && (
+          <SourceSwitcher active={activeSource} onChange={(s) => { setActiveSource(s); onDiscoverPinsChange([]); onSelectDiscoverIndex(null); }} />
+        )}
+        <MichelinDiscoverView
+          citySlug={michelinCitySlug}
+          cityId={cityId}
+          existingPlaces={existingPlaces}
+          onPlaceAdded={onPlaceAdded}
+          onDiscoverPinsChange={onDiscoverPinsChange}
+          selectedDiscoverIndex={selectedDiscoverIndex}
+          onSelectDiscoverIndex={onSelectDiscoverIndex}
+          isoGeoJson={isoGeoJson}
+          onOpenPlace={onOpenPlace}
+        />
+      </div>
+    );
+  }
+
+  // Fall through to Infatuation source (rendered below)
+  return (
+    <InfatuationDiscoverView
+      citySlug={infatuationSlug!}
+      cityId={cityId}
+      existingPlaces={existingPlaces}
+      onPlaceAdded={onPlaceAdded}
+      onDiscoverPinsChange={onDiscoverPinsChange}
+      selectedDiscoverIndex={selectedDiscoverIndex}
+      onSelectDiscoverIndex={onSelectDiscoverIndex}
+      isoGeoJson={isoGeoJson}
+      onOpenPlace={onOpenPlace}
+      sourceSwitcher={hasBoth ? (
+        <SourceSwitcher active={activeSource} onChange={(s) => { setActiveSource(s); onDiscoverPinsChange([]); onSelectDiscoverIndex(null); }} />
+      ) : null}
+    />
+  );
+}
+
+function SourceSwitcher({ active, onChange }: { active: DiscoverSource; onChange: (s: DiscoverSource) => void }) {
+  return (
+    <div className="flex gap-1 px-4 pb-3">
+      <button
+        onClick={() => onChange("infatuation")}
+        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+          active === "infatuation"
+            ? "bg-[var(--color-amber)] text-white"
+            : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+        }`}
+      >
+        Infatuation
+      </button>
+      <button
+        onClick={() => onChange("michelin")}
+        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+          active === "michelin"
+            ? "bg-[var(--color-amber)] text-white"
+            : "bg-[var(--color-sidebar-surface)] text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+        }`}
+      >
+        Michelin
+      </button>
+    </div>
+  );
+}
+
+interface InfatuationDiscoverViewProps {
+  citySlug: string;
+  cityId: number;
+  existingPlaces: Place[];
+  onPlaceAdded: (place: Place) => void;
+  onDiscoverPinsChange: (pins: DiscoverPin[]) => void;
+  selectedDiscoverIndex: number | null;
+  onSelectDiscoverIndex: (index: number | null) => void;
+  isoGeoJson?: GeoJSON.FeatureCollection | null;
+  onOpenPlace?: (place: Place) => void;
+  sourceSwitcher?: React.ReactNode;
+}
+
+function InfatuationDiscoverView({
+  citySlug,
+  cityId,
+  existingPlaces,
+  onPlaceAdded,
+  onDiscoverPinsChange,
+  selectedDiscoverIndex,
+  onSelectDiscoverIndex,
+  isoGeoJson,
+  onOpenPlace,
+  sourceSwitcher,
+}: InfatuationDiscoverViewProps) {
   const [guides, setGuides] = useState<GuideListItem[]>([]);
   const [loadingGuides, setLoadingGuides] = useState(true);
   const [selectedGuideSlug, setSelectedGuideSlug] = useState<string | null>(null);
@@ -351,8 +463,11 @@ export default function DiscoverPanel({
   // No guides
   if (guides.length === 0) {
     return (
-      <div className="py-12 text-center text-sm text-[var(--color-sidebar-muted)]">
-        No Infatuation guides found for this city
+      <div>
+        {sourceSwitcher}
+        <div className="py-12 text-center text-sm text-[var(--color-sidebar-muted)]">
+          No Infatuation guides found for this city
+        </div>
       </div>
     );
   }
@@ -462,7 +577,9 @@ export default function DiscoverPanel({
 
   // Guide list view
   return (
-    <div className="space-y-2 px-4 pb-4">
+    <div>
+      {sourceSwitcher}
+      <div className="space-y-2 px-4 pb-4">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
         {guides.length} guide{guides.length !== 1 ? "s" : ""}
       </p>
@@ -495,6 +612,7 @@ export default function DiscoverPanel({
           )}
         </button>
       ))}
+      </div>
     </div>
   );
 }

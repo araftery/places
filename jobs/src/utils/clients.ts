@@ -6,6 +6,7 @@ import {
   createResyClient,
   createOpenTableClient,
   createSevenRoomsClient,
+  createMichelinClient,
 } from "@places/clients";
 
 export function getProxyUrl(sessionId: string): string | undefined {
@@ -65,5 +66,11 @@ export function getOpenTableClient(sessionId: string) {
 export function getSevenRoomsClient(sessionId: string) {
   return createSevenRoomsClient({
     proxyUrl: getProxyUrl(sessionId),
+  });
+}
+
+export function getMichelinClient(sessionId?: string) {
+  return createMichelinClient({
+    proxyUrl: sessionId ? getProxyUrl(sessionId) : undefined,
   });
 }

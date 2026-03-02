@@ -12,6 +12,7 @@
     "./resy": "./src/resy/index.ts",
     "./opentable": "./src/opentable/index.ts",
     "./sevenrooms": "./src/sevenrooms/index.ts",
+    "./michelin": "./src/michelin/index.ts",
     "./proxy": "./src/proxy.ts"
   },
   "scripts": {

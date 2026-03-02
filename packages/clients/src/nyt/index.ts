@@ -31,7 +31,7 @@ const NytEdgeSchema = z.object({
       }).passthrough()).default([]),
     }).passthrough()).default([]),
     reviewItems: z.array(z.object({
-      isCriticsPick: z.boolean(),
+      isCriticsPick: z.boolean().optional().default(false),
     }).passthrough()).default([]),
     promotionalMedia: z.object({
       crops: z.array(z.object({
@@ -50,7 +50,7 @@ const NytEdgeSchema = z.object({
     priceCategory: z.string().nullable().optional(),
     cuisines: z.array(z.string()).default([]),
     shortSummary: z.string().optional(),
-    isCriticsPick: z.boolean(),
+    isCriticsPick: z.boolean().optional().default(false),
     reservationsUrl: z.string().optional(),
     sourceId: z.string(),
     contactDetails: z.object({
@@ -64,7 +64,7 @@ const NytEdgeSchema = z.object({
           url: z.string(),
         }).passthrough()).default([]),
       }).passthrough()).default([]),
-    }).passthrough().optional(),
+    }).passthrough().nullable().optional(),
     firstPublished: z.string().optional(),
   }).passthrough(),
 }).passthrough();

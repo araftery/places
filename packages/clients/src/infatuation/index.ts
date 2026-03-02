@@ -56,12 +56,12 @@ const ContentfulVenueSchema = z.object({
 const ContentfulReviewItemSchema = z.object({
   title: z.string().optional(),
   rating: z.number().optional(),
-  headline: z.string().optional(),
-  preview: z.string().optional(),
-  publishDate: z.string().optional(),
-  canonicalPath: z.string().optional(),
-  slug: z.object({ name: z.string() }).passthrough().optional(),
-  status: z.string().optional(),
+  headline: z.string().nullable().optional(),
+  preview: z.string().nullable().optional(),
+  publishDate: z.string().nullable().optional(),
+  canonicalPath: z.string().nullable().optional(),
+  slug: z.object({ name: z.string() }).passthrough().nullable().optional(),
+  status: z.string().nullable().optional(),
   venue: ContentfulVenueSchema.optional(),
   neighborhoodTagsCollection: z.object({
     items: z.array(z.object({

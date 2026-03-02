@@ -6,6 +6,7 @@ import { scrapeGoogle } from "../providers/google";
 import { scrapeInfatuation } from "../providers/infatuation";
 import { scrapeBeli } from "../providers/beli";
 import { scrapeNyt } from "../providers/nyt";
+import { scrapeMichelin } from "../providers/michelin";
 import { upsertRating, upsertAudit, markAuditFailed } from "../utils/ratings";
 import { extractError } from "../utils/errors";
 import { generateSessionId } from "../utils/clients";
@@ -15,9 +16,10 @@ const AUDIT_DAYS: Record<string, number> = {
   infatuation: 30,
   beli: 14,
   nyt: 30,
+  michelin: 30,
 };
 
-type PlaceInfo = { id: number; name: string; cityName: string | null; infatuationSlug: string | null; lat: number; lng: number; googlePlaceId: string | null };
+type PlaceInfo = { id: number; name: string; cityName: string | null; infatuationSlug: string | null; michelinCitySlug: string | null; lat: number; lng: number; googlePlaceId: string | null };
 
 function getScrapers(sessionId: string): Record<string, (place: PlaceInfo) => Promise<import("../utils/ratings").ScrapeResult>> {
   return {
@@ -25,6 +27,7 @@ function getScrapers(sessionId: string): Record<string, (place: PlaceInfo) => Pr
     infatuation: (p) => scrapeInfatuation(p, undefined, sessionId),
     beli: (p) => scrapeBeli(p, undefined, sessionId),
     nyt: (p) => scrapeNyt(p, undefined, sessionId),
+    michelin: (p) => scrapeMichelin(p, undefined, sessionId),
   };
 }
 
@@ -48,6 +51,7 @@ export const initiateCoverageTask = task({
     let providers = ["google"];
     let cityName: string | null = null;
     let infatuationSlug: string | null = null;
+    let michelinCitySlug: string | null = null;
 
     if (place.cityId) {
       const [city] = await db
@@ -58,6 +62,7 @@ export const initiateCoverageTask = task({
         providers = city.providers;
         cityName = city.name;
         infatuationSlug = city.infatuationSlug;
+        michelinCitySlug = city.michelinCitySlug;
       } else {
         logger.warn("City not found for place", {
           placeId: place.id,
@@ -74,6 +79,15 @@ export const initiateCoverageTask = task({
     if (!infatuationSlug && providers.includes("infatuation")) {
       providers = providers.filter((p) => p !== "infatuation");
       logger.info("Skipping infatuation — no city slug configured", {
+        placeId: place.id,
+        cityName,
+      });
+    }
+
+    // Skip michelin if city has no michelin slug
+    if (!michelinCitySlug && providers.includes("michelin")) {
+      providers = providers.filter((p) => p !== "michelin");
+      logger.info("Skipping michelin — no city slug configured", {
         placeId: place.id,
         cityName,
       });
@@ -110,6 +124,7 @@ export const initiateCoverageTask = task({
             name: place.name,
             cityName,
             infatuationSlug,
+            michelinCitySlug,
             lat: place.lat,
             lng: place.lng,
             googlePlaceId: place.googlePlaceId,
