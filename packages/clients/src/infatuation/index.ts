@@ -489,6 +489,7 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
                     rating
                     preview
                     publishDate
+                    headerImageV2
                     slug { name }
                     canonicalPath
                     neighborhoodTagsCollection(limit: 1) { items { displayName } }
@@ -515,6 +516,7 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
                         rating
                         preview
                         publishDate
+                        headerImageV2
                         slug { name }
                         canonicalPath
                         neighborhoodTagsCollection(limit: 1) { items { displayName } }
@@ -584,11 +586,18 @@ export function createInfatuationClient(config?: InfatuationClientConfig) {
       const neighborhoodTags = (review.neighborhoodTagsCollection as Record<string, unknown>)?.items as Array<Record<string, string>> | undefined;
       const neighborhood = neighborhoodTags?.[0]?.displayName || null;
 
-      // Extract first image from gallery assets (Cloudinary JSON)
+      // Extract first image from gallery assets or review headerImageV2 (Cloudinary JSON)
       const gallery = caption.gallery as Record<string, unknown> | null;
       const assets = gallery?.assets as Array<Record<string, unknown>> | null;
       const firstAsset = assets?.[0];
-      const imageUrl = (firstAsset?.secure_url as string) || (firstAsset?.url as string) || null;
+      let imageUrl = (firstAsset?.secure_url as string) || (firstAsset?.url as string) || null;
+
+      // Fallback: review headerImageV2 (array of Cloudinary objects)
+      if (!imageUrl) {
+        const headerImages = review.headerImageV2 as Array<Record<string, unknown>> | null;
+        const firstHeader = headerImages?.[0];
+        imageUrl = (firstHeader?.secure_url as string) || (firstHeader?.url as string) || null;
+      }
 
       restaurants.push({
         headline: (caption.headline as string) || null,

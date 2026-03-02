@@ -281,10 +281,11 @@ export default function DiscoverPanel({
 
         if (data.duplicate) {
           setAddStatuses((prev) => ({ ...prev, [key]: "duplicate" }));
-          setErrors((prev) => ({
-            ...prev,
-            [key]: `Already saved as "${data.existingName}"`,
-          }));
+          // Open the existing place's details
+          if (onOpenPlace && data.existingId) {
+            const existingPlace = existingPlaces.find((p) => p.id === data.existingId);
+            if (existingPlace) onOpenPlace(existingPlace);
+          }
           return;
         }
 
@@ -301,7 +302,7 @@ export default function DiscoverPanel({
         setErrors((prev) => ({ ...prev, [key]: "Failed to add" }));
       }
     },
-    [cityId, selectedGuide, onPlaceAdded, onOpenPlace, restaurantToPinIndex, onSelectDiscoverIndex]
+    [cityId, selectedGuide, onPlaceAdded, onOpenPlace, existingPlaces, restaurantToPinIndex, onSelectDiscoverIndex]
   );
 
   const handleBack = useCallback(() => {
@@ -334,7 +335,7 @@ export default function DiscoverPanel({
     if (ri == null) return;
     const el = cardRefs.current.get(ri);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [selectedDiscoverIndex, pinToRestaurantIndex]);
 

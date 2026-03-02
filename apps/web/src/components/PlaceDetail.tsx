@@ -929,7 +929,7 @@ export default function PlaceDetail({
                   )}
                   {place.openingTime && (
                     <p className="text-xs text-[var(--color-ink-light)]">
-                      Opens daily at {place.openingTime}
+                      Opens daily at {place.openingTime?.slice(0, 5)}
                     </p>
                   )}
                   {place.lastAvailableDate && (
@@ -952,7 +952,7 @@ export default function PlaceDetail({
                           day: "numeric",
                         });
                       })()}{" "}
-                      at {place.openingTime}
+                      at {place.openingTime?.slice(0, 5)}
                     </p>
                   )}
                   {place.reservationUrl && (

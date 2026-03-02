@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
       matched: true,
       duplicate: true,
       existingName: existing.name,
+      existingId: existing.id,
     });
   }
 
