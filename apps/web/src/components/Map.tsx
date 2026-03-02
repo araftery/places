@@ -441,7 +441,7 @@ export default function Map({
       {discoverPins?.map((pin, i) => {
         const isDiscoverSelected = selectedDiscoverIndex === i;
         const pinColor = pin.alreadyInList ? "#5b7b9a" : "#c47d2e";
-        const size = isDiscoverSelected ? 16 : 12;
+        const size = isDiscoverSelected ? 20 : 14;
         return (
           <Marker
             key={`discover-${i}-${pin.lat}-${pin.lng}`}
