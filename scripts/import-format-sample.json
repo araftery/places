@@ -1,0 +1,35 @@
+[
+  {
+    "googlePlaceId": "ChIJ11Kj6D5ZwokR1_xM1x2XwVs",
+    "tags": ["Coffee"],
+    "cuisines": [],
+    "placeType": "cafe",
+    "lists": ["Coffee/work"],
+    "skip": false
+  },
+  {
+    "googlePlaceId": "ChIJN1t_tDeuEmsRUsoyG83frY4",
+    "tags": ["Omakase", "Tasting Menu"],
+    "cuisines": ["Japanese"],
+    "placeType": null,
+    "lists": ["Omakase", "Tasting menu"],
+    "skip": false
+  },
+  {
+    "googlePlaceId": "ChIJxyz_EXAMPLE_SKIP",
+    "tags": [],
+    "cuisines": [],
+    "placeType": null,
+    "lists": ["Screenshots"],
+    "skip": true
+  },
+  {
+    "googlePlaceId": null,
+    "tags": [],
+    "cuisines": [],
+    "placeType": null,
+    "lists": ["Want to go"],
+    "skip": false,
+    "_comment": "null placeId entries are skipped automatically"
+  }
+]
