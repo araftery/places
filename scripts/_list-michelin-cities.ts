@@ -49,7 +49,7 @@ async function main() {
     for (const [slug, count] of sorted) {
       const match = cities.find(
         (c) => c.name.toLowerCase().replace(/\s+/g, "-") === slug ||
-               c.michelinCitySlug === slug
+               c.michelinCitySlugs.includes(slug)
       );
       const marker = match ? `✓ ${match.name} (id=${match.id})` : "";
       console.log(`${slug.padEnd(40)}${String(count).padEnd(8)}${marker}`);

@@ -55,7 +55,7 @@ Async job system for multi-source rating scraping and scheduled audits:
 - `audit-infatuation` — monthly Infatuation re-scrape
 - `audit-beli` — biweekly Beli re-scrape
 - `audit-nyt` — monthly NYT re-scrape
-- Michelin is included in `initiate-coverage` (30-day audit cycle, skipped if city has no `michelinCitySlug`)
+- Michelin is included in `initiate-coverage` (30-day audit cycle, skipped if city has no `michelinCitySlugs`)
 
 ## Tech Stack
 
@@ -116,11 +116,11 @@ For other packages:
 
 ## Discover Tab
 
-Browse restaurant guides and directories per city and one-click add to your places list. Supports two sources: **Infatuation** (editorial guides) and **Michelin Guide** (flat directory with distinction filters). Available when the selected city has `infatuationSlug` and/or `michelinCitySlug` set on the `cities` table.
+Browse restaurant guides and directories per city and one-click add to your places list. Supports two sources: **Infatuation** (editorial guides) and **Michelin Guide** (flat directory with distinction filters). Available when the selected city has `infatuationSlug` and/or `michelinCitySlugs` set on the `cities` table.
 
 ### Source Switcher
 
-When a city has both sources, `DiscoverPanel` renders a segmented control (Infatuation / Michelin) at the top. `DiscoverPanel` accepts `infatuationSlug: string | null` and `michelinCitySlug: string | null` props (not a single `citySlug`). The Infatuation view is rendered by the internal `InfatuationDiscoverView` component; the Michelin view by `MichelinDiscoverView`.
+When a city has both sources, `DiscoverPanel` renders a segmented control (Infatuation / Michelin) at the top. `DiscoverPanel` accepts `infatuationSlug: string | null` and `michelinCitySlugs: string[]` props. The Infatuation view is rendered by the internal `InfatuationDiscoverView` component; the Michelin view by `MichelinDiscoverView`.
 
 ### Infatuation
 
@@ -146,7 +146,7 @@ Browses the Michelin restaurant directory filtered by distinction level. No guid
 - Zod schemas use `.nullable().optional()` on most fields since the Algolia API returns `null` liberally
 - Price mapping: affordable=1, mid-range=2, premium=3, luxury=4
 
-**City slugs** (`cities.michelinCitySlug`): Michelin Algolia city slugs vary in format — some are plain (`new-york`, `paris`, `barcelona`), some have numeric suffixes (`austin_2958315`, `boston_2914838`). Use `scripts/_list-michelin-cities.ts` to query all slugs from Algolia via facet search, or search for a specific restaurant in a city to discover its `city.slug` value.
+**City slugs** (`cities.michelinCitySlugs`): A `jsonb` array of Michelin Algolia city slugs. Most cities have one slug, but cities with multiple boroughs (e.g. NYC) can have multiple slugs queried together with OR. Slugs vary in format — some are plain (`new-york`, `paris`, `barcelona`), some have numeric suffixes (`austin_2958315`, `boston_2914838`). Use `scripts/_list-michelin-cities.ts` to query all slugs from Algolia via facet search, or search for a specific restaurant in a city to discover its `city.slug` value.
 
 **Components**:
 - **`MichelinDiscoverView`** (`apps/web/src/components/MichelinDiscoverView.tsx`) — distinction filter chips (All / 3 Stars / 2 Stars / 1 Star / Bib Gourmand / Selected), paginated restaurant list with "Load more" button, isochrone filtering, pin ↔ card sync
@@ -243,7 +243,7 @@ GEMINI_API_KEY            # Google Gemini API key (website scanner)
 
 Schema is in `packages/db/src/schema.ts`. Tables: `cities`, `places`, `tags`, `place_tags` (junction), `place_ratings`, `place_audits`, `cuisines`, `place_cuisines`, `lists`, `place_lists`. After schema changes, run `pnpm db:generate` then `pnpm db:migrate` (or `db:push` for quick iteration). Drizzle config points to `../../packages/db/src/schema.ts`.
 
-Cities have `infatuationSlug` and `michelinCitySlug` columns that control which Discover sources are available and whether initiate-coverage includes those providers.
+Cities have `infatuationSlug` (text) and `michelinCitySlugs` (jsonb array) columns that control which Discover sources are available and whether initiate-coverage includes those providers.
 
 ## Visual Design
 

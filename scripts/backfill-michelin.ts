@@ -95,14 +95,14 @@ async function main() {
   const allCities = await db.select().from(schema.cities);
   const city = allCities.find(
     (c) =>
-      c.michelinCitySlug === citySlug ||
+      c.michelinCitySlugs.includes(citySlug) ||
       c.name.toLowerCase().replace(/\s+/g, "-") === citySlug
   );
 
   if (!city) {
     console.error(
-      `No city found with michelinCitySlug="${citySlug}". Available cities:`,
-      allCities.map((c) => `${c.name} (michelin: ${c.michelinCitySlug})`).join(", ")
+      `No city found with michelinCitySlugs containing "${citySlug}". Available cities:`,
+      allCities.map((c) => `${c.name} (michelin: ${JSON.stringify(c.michelinCitySlugs)})`).join(", ")
     );
     process.exit(1);
   }

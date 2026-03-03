@@ -20,7 +20,7 @@ type DiscoverSource = "infatuation" | "michelin";
 
 interface DiscoverPanelProps {
   infatuationSlug: string | null;
-  michelinCitySlug: string | null;
+  michelinCitySlugs: string[];
   cityId: number;
   existingPlaces: Place[];
   onPlaceAdded: (place: Place) => void;
@@ -35,7 +35,7 @@ type AddStatus = "idle" | "adding" | "added" | "duplicate" | "no-match";
 
 export default function DiscoverPanel({
   infatuationSlug,
-  michelinCitySlug,
+  michelinCitySlugs,
   cityId,
   existingPlaces,
   onPlaceAdded,
@@ -45,7 +45,7 @@ export default function DiscoverPanel({
   isoGeoJson,
   onOpenPlace,
 }: DiscoverPanelProps) {
-  const hasBoth = !!infatuationSlug && !!michelinCitySlug;
+  const hasBoth = !!infatuationSlug && michelinCitySlugs.length > 0;
   const defaultSource: DiscoverSource = infatuationSlug ? "infatuation" : "michelin";
   const [activeSource, setActiveSource] = useState<DiscoverSource>(defaultSource);
 
@@ -54,20 +54,20 @@ export default function DiscoverPanel({
     if (!infatuationSlug && activeSource === "infatuation") {
       setActiveSource("michelin");
     }
-    if (!michelinCitySlug && activeSource === "michelin") {
+    if (michelinCitySlugs.length === 0 && activeSource === "michelin") {
       setActiveSource("infatuation");
     }
-  }, [infatuationSlug, michelinCitySlug]);
+  }, [infatuationSlug, michelinCitySlugs.length]);
 
   // Michelin source
-  if (activeSource === "michelin" && michelinCitySlug) {
+  if (activeSource === "michelin" && michelinCitySlugs.length > 0) {
     return (
       <div className="flex flex-col">
         {hasBoth && (
           <SourceSwitcher active={activeSource} onChange={(s) => { setActiveSource(s); onDiscoverPinsChange([]); onSelectDiscoverIndex(null); }} />
         )}
         <MichelinDiscoverView
-          citySlug={michelinCitySlug}
+          citySlugs={michelinCitySlugs}
           cityId={cityId}
           existingPlaces={existingPlaces}
           onPlaceAdded={onPlaceAdded}

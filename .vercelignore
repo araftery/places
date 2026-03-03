@@ -1,0 +1,18 @@
+# Jobs (separate deployment)
+jobs/
+
+# Scripts
+scripts/
+
+# Playwright browsers (huge)
+**/ms-playwright/
+
+# Build artifacts
+.trigger/
+.next/
+dist/
+
+# Misc
+.vscode/
+.git/
+*.tsbuildinfo

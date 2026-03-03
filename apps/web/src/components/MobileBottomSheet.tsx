@@ -133,7 +133,7 @@ export default function MobileBottomSheet({
     () => (selectedCityId ? cities.find((c) => c.id === selectedCityId) : null),
     [selectedCityId, cities]
   );
-  const hasDiscover = !!selectedCity?.infatuationSlug || !!selectedCity?.michelinCitySlug;
+  const hasDiscover = !!selectedCity?.infatuationSlug || (selectedCity?.michelinCitySlugs?.length ?? 0) > 0;
 
   const activeFilterCount =
     (filters.showArchived ? 1 : 0) +
@@ -257,7 +257,7 @@ export default function MobileBottomSheet({
           <div className="h-full overflow-y-auto py-2 sidebar-scroll">
             <DiscoverPanel
               infatuationSlug={selectedCity.infatuationSlug}
-              michelinCitySlug={selectedCity.michelinCitySlug}
+              michelinCitySlugs={selectedCity.michelinCitySlugs}
               cityId={selectedCity.id}
               existingPlaces={allPlaces || places}
               onPlaceAdded={onPlaceAdded || (() => { /* noop */ })}

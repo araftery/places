@@ -339,7 +339,7 @@ export default function Sidebar({
     () => (selectedCityId ? cities.find((c) => c.id === selectedCityId) : null),
     [selectedCityId, cities]
   );
-  const hasDiscover = !!selectedCity?.infatuationSlug || !!selectedCity?.michelinCitySlug;
+  const hasDiscover = !!selectedCity?.infatuationSlug || (selectedCity?.michelinCitySlugs?.length ?? 0) > 0;
 
   return (
     <div className="relative flex h-full flex-col bg-[var(--color-sidebar-bg)] grain">
@@ -480,7 +480,7 @@ export default function Sidebar({
           <div className="h-full overflow-y-auto py-3 sidebar-scroll">
             <DiscoverPanel
               infatuationSlug={selectedCity.infatuationSlug}
-              michelinCitySlug={selectedCity.michelinCitySlug}
+              michelinCitySlugs={selectedCity.michelinCitySlugs}
               cityId={selectedCity.id}
               existingPlaces={allPlaces || places}
               onPlaceAdded={onPlaceAdded || (() => { /* noop */ })}

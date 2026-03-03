@@ -246,13 +246,18 @@ export function createMichelinClient(config?: MichelinClientConfig) {
    * Optional distinction filter: "3 STARS", "2 STARS", "1 STAR", "BIB_GOURMAND", "SELECTED"
    */
   async function listRestaurants(
-    citySlug: string,
+    citySlugs: string | string[],
     options?: { distinction?: string; page?: number; hitsPerPage?: number }
   ): Promise<MichelinListResult> {
     const page = options?.page ?? 0;
     const hitsPerPage = options?.hitsPerPage ?? 20;
 
-    let filters = `status:Published AND city.slug:"${citySlug}"`;
+    const slugs = Array.isArray(citySlugs) ? citySlugs : [citySlugs];
+    const cityFilter = slugs.length === 1
+      ? `city.slug:"${slugs[0]}"`
+      : `(${slugs.map((s) => `city.slug:"${s}"`).join(" OR ")})`;
+
+    let filters = `status:Published AND ${cityFilter}`;
     if (options?.distinction) {
       filters += ` AND michelin_award:"${options.distinction}"`;
     }

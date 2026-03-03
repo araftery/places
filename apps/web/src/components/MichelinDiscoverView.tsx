@@ -19,7 +19,7 @@ const DISTINCTION_FILTERS = [
 ] as const;
 
 interface MichelinDiscoverViewProps {
-  citySlug: string;
+  citySlugs: string[];
   cityId: number;
   existingPlaces: Place[];
   onPlaceAdded: (place: Place) => void;
@@ -31,7 +31,7 @@ interface MichelinDiscoverViewProps {
 }
 
 export default function MichelinDiscoverView({
-  citySlug,
+  citySlugs,
   cityId,
   existingPlaces,
   onPlaceAdded,
@@ -88,7 +88,7 @@ export default function MichelinDiscoverView({
       }
 
       try {
-        const params = new URLSearchParams({ citySlug, page: String(pageNum) });
+        const params = new URLSearchParams({ citySlugs: citySlugs.join(","), page: String(pageNum) });
         if (distinction) params.set("distinction", distinction);
 
         const res = await fetch(`/api/discover/michelin?${params}`);
@@ -109,10 +109,11 @@ export default function MichelinDiscoverView({
         setLoadingMore(false);
       }
     },
-    [citySlug, distinction]
+    [citySlugs.join(","), distinction]
   );
 
-  // Reload on slug or distinction change
+  // Reload on slugs or distinction change
+  const citySlugsKey = citySlugs.join(",");
   useEffect(() => {
     setRestaurants([]);
     setPage(0);
@@ -120,7 +121,7 @@ export default function MichelinDiscoverView({
     setErrors({});
     onDiscoverPinsChange([]);
     fetchRestaurants(0, true);
-  }, [citySlug, distinction]);
+  }, [citySlugsKey, distinction]);
 
   // Isochrone filtering
   const isochroneActive = !!isoGeoJson;

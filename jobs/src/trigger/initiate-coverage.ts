@@ -19,7 +19,7 @@ const AUDIT_DAYS: Record<string, number> = {
   michelin: 30,
 };
 
-type PlaceInfo = { id: number; name: string; cityName: string | null; infatuationSlug: string | null; michelinCitySlug: string | null; lat: number; lng: number; googlePlaceId: string | null };
+type PlaceInfo = { id: number; name: string; cityName: string | null; infatuationSlug: string | null; michelinCitySlugs: string[]; lat: number; lng: number; googlePlaceId: string | null };
 
 function getScrapers(sessionId: string): Record<string, (place: PlaceInfo) => Promise<import("../utils/ratings").ScrapeResult>> {
   return {
@@ -51,7 +51,7 @@ export const initiateCoverageTask = task({
     let providers = ["google"];
     let cityName: string | null = null;
     let infatuationSlug: string | null = null;
-    let michelinCitySlug: string | null = null;
+    let michelinCitySlugs: string[] = [];
 
     if (place.cityId) {
       const [city] = await db
@@ -62,7 +62,7 @@ export const initiateCoverageTask = task({
         providers = city.providers;
         cityName = city.name;
         infatuationSlug = city.infatuationSlug;
-        michelinCitySlug = city.michelinCitySlug;
+        michelinCitySlugs = city.michelinCitySlugs;
       } else {
         logger.warn("City not found for place", {
           placeId: place.id,
@@ -85,7 +85,7 @@ export const initiateCoverageTask = task({
     }
 
     // Skip michelin if city has no michelin slug
-    if (!michelinCitySlug && providers.includes("michelin")) {
+    if (michelinCitySlugs.length === 0 && providers.includes("michelin")) {
       providers = providers.filter((p) => p !== "michelin");
       logger.info("Skipping michelin — no city slug configured", {
         placeId: place.id,
@@ -124,7 +124,7 @@ export const initiateCoverageTask = task({
             name: place.name,
             cityName,
             infatuationSlug,
-            michelinCitySlug,
+            michelinCitySlugs,
             lat: place.lat,
             lng: place.lng,
             googlePlaceId: place.googlePlaceId,
