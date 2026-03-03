@@ -55,6 +55,7 @@ interface MapProps {
   buildingListId?: number | null;
   onTogglePlaceInList?: (placeId: number, listId: number) => Promise<void>;
   neighborhoodGeoJson?: GeoJSON.FeatureCollection | null;
+  activeTab?: "places" | "discover" | "lists";
 }
 
 const INTERACTIVE_LAYER_IDS = ["place-dots"];
@@ -77,6 +78,7 @@ export default function Map({
   buildingListId,
   onTogglePlaceInList,
   neighborhoodGeoJson,
+  activeTab,
 }: MapProps) {
   const mapRef = useRef<MapRef>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -225,8 +227,8 @@ export default function Map({
   const onMouseEnter = useCallback(() => setCursor("pointer"), []);
   const onMouseLeave = useCallback(() => setCursor(""), []);
 
-  // Hide places source when discover is active
-  const showPlaces = !discoverPins?.length;
+  // Hide places when discover tab is active (not based on pin count, to avoid flash on filter change)
+  const showPlaces = activeTab !== "discover";
 
   // Layer paint/layout definitions
   const dotLayer: LayerProps = {

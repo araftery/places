@@ -598,6 +598,7 @@ export default function Home() {
           buildingListId={buildingListId}
           onTogglePlaceInList={handleTogglePlaceInList}
           neighborhoodGeoJson={neighborhoodGeoJson}
+          activeTab={activeTab}
         />
 
         {/* Map overlay controls */}
