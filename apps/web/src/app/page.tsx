@@ -382,6 +382,53 @@ export default function Home() {
     if (buildingListId === id) setBuildingListId(null);
   }
 
+  async function handleTogglePlaceTag(placeId: number, tagId: number) {
+    const place = places.find((p) => p.id === placeId);
+    if (!place) return;
+    const hasTag = place.tags.some((t) => t.id === tagId);
+
+    // Optimistic update
+    const tag = tags.find((t) => t.id === tagId);
+    if (!tag) return;
+    const updateTags = (p: Place) =>
+      p.id === placeId
+        ? {
+            ...p,
+            tags: hasTag
+              ? p.tags.filter((t) => t.id !== tagId)
+              : [...p.tags, { id: tag.id, name: tag.name, color: tag.color }],
+          }
+        : p;
+    setPlaces((prev) => prev.map(updateTags));
+    setSelectedPlace((prev) => (prev ? updateTags(prev) : prev));
+
+    try {
+      if (hasTag) {
+        await fetch("/api/places/tags", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ placeId, tagId }),
+        });
+      } else {
+        await fetch("/api/places/tags", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ placeId, tagId }),
+        });
+      }
+    } catch {
+      // Revert on failure
+      setPlaces((prev) =>
+        prev.map((p) =>
+          p.id === placeId ? { ...p, tags: place.tags } : p
+        )
+      );
+      setSelectedPlace((prev) =>
+        prev?.id === placeId ? { ...prev, tags: place.tags } : prev
+      );
+    }
+  }
+
   async function handleTogglePlaceInList(placeId: number, listId: number) {
     const place = places.find((p) => p.id === placeId);
     if (!place) return;
@@ -657,6 +704,7 @@ export default function Home() {
             onCuisineCreated={fetchCuisines}
             onTogglePlaceInList={handleTogglePlaceInList}
             onCreateList={handleCreateList}
+            onTogglePlaceTag={handleTogglePlaceTag}
           />
         </div>
       )}
@@ -722,6 +770,7 @@ export default function Home() {
             onCuisineCreated={fetchCuisines}
             onTogglePlaceInList={handleTogglePlaceInList}
             onCreateList={handleCreateList}
+            onTogglePlaceTag={handleTogglePlaceTag}
           />
         </div>
       )}

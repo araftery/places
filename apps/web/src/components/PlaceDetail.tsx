@@ -29,6 +29,7 @@ interface PlaceDetailProps {
   onCuisineCreated: () => void;
   onTogglePlaceInList?: (placeId: number, listId: number) => Promise<void>;
   onCreateList?: (name: string) => Promise<List>;
+  onTogglePlaceTag?: (placeId: number, tagId: number) => Promise<void>;
 }
 
 function ChevronIcon({ expanded }: { expanded: boolean }) {
@@ -260,19 +261,19 @@ export default function PlaceDetail({
   onCuisineCreated,
   onTogglePlaceInList,
   onCreateList,
+  onTogglePlaceTag,
 }: PlaceDetailProps) {
   const [editing, setEditing] = useState(false);
   const [showListPopover, setShowListPopover] = useState(false);
   const [newListName, setNewListName] = useState("");
   const listPopoverRef = useRef<HTMLDivElement>(null);
+  const [showTagPopover, setShowTagPopover] = useState(false);
+  const [newViewTagName, setNewViewTagName] = useState("");
+  const tagPopoverRef = useRef<HTMLDivElement>(null);
   const [beenThere, setBeenThere] = useState(place.beenThere);
   const [placeType, setPlaceType] = useState(place.placeType || "");
   const [notes, setNotes] = useState(place.personalNotes || "");
   const [source, setSource] = useState(place.source || "");
-  const [selectedTagIds, setSelectedTagIds] = useState<number[]>(
-    place.tags.map((t) => t.id)
-  );
-  const [newTagName, setNewTagName] = useState("");
   const [selectedCuisineIds, setSelectedCuisineIds] = useState<number[]>(
     place.cuisines?.map((c) => c.id) || []
   );
@@ -359,6 +360,19 @@ export default function PlaceDetail({
     }
   }, [showListPopover]);
 
+  // Close tag popover on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (tagPopoverRef.current && !tagPopoverRef.current.contains(e.target as Node)) {
+        setShowTagPopover(false);
+      }
+    }
+    if (showTagPopover) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showTagPopover]);
+
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
 
   const dayNames = [
@@ -371,13 +385,6 @@ export default function PlaceDetail({
     "Saturday",
   ];
   const todayName = dayNames[new Date().getDay()];
-
-  async function handleAddTag() {
-    if (!newTagName.trim()) return;
-    const tag = await onCreateTag(newTagName.trim());
-    setSelectedTagIds((prev) => [...prev, tag.id]);
-    setNewTagName("");
-  }
 
   async function handleAddCuisine() {
     if (!newCuisineName.trim()) return;
@@ -406,7 +413,6 @@ export default function PlaceDetail({
           placeType: placeType || null,
           personalNotes: notes || null,
           source: source || null,
-          tagIds: selectedTagIds,
           cuisineIds: selectedCuisineIds,
           reservationProvider: resProvider || null,
           reservationUrl: resUrl || null,
@@ -419,9 +425,8 @@ export default function PlaceDetail({
         }),
       });
       const updated = await res.json();
-      const updatedTags = tags.filter((t) => selectedTagIds.includes(t.id));
       const updatedCuisines = cuisines.filter((c) => selectedCuisineIds.includes(c.id));
-      onUpdate({ ...place, ...updated, tags: updatedTags, cuisines: updatedCuisines });
+      onUpdate({ ...place, ...updated, tags: place.tags, cuisines: updatedCuisines });
       setEditing(false);
     } finally {
       setSaving(false);
@@ -564,59 +569,6 @@ export default function PlaceDetail({
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-                Tags
-              </label>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {tags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() =>
-                      setSelectedTagIds((prev) =>
-                        prev.includes(tag.id)
-                          ? prev.filter((id) => id !== tag.id)
-                          : [...prev, tag.id]
-                      )
-                    }
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                      selectedTagIds.includes(tag.id)
-                        ? "text-white"
-                        : "border border-[#d4c9bb] bg-[var(--color-cream)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-                    }`}
-                    style={
-                      selectedTagIds.includes(tag.id)
-                        ? { backgroundColor: tag.color }
-                        : {}
-                    }
-                  >
-                    {tag.name}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-2 flex gap-2">
-                <input
-                  value={newTagName}
-                  onChange={(e) => setNewTagName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddTag();
-                    }
-                  }}
-                  className="flex-1 rounded-md border border-[#d4c9bb] bg-white px-3 py-1.5 text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                  placeholder="New tag..."
-                />
-                <button
-                  onClick={handleAddTag}
-                  type="button"
-                  className="rounded-md border border-[#d4c9bb] bg-[var(--color-cream)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
-                >
-                  Add
-                </button>
-              </div>
             </div>
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
@@ -1042,8 +994,8 @@ export default function PlaceDetail({
             )}
 
             {/* Tags & Cuisines */}
-            {(place.tags.length > 0 || (place.cuisines?.length ?? 0) > 0) && (
-              <div className="flex flex-wrap gap-1.5">
+            {(onTogglePlaceTag || place.tags.length > 0 || (place.cuisines?.length ?? 0) > 0) && (
+              <div className="flex flex-wrap items-center gap-1.5">
                 {place.tags.map((tag) => (
                   <span
                     key={`tag-${tag.id}`}
@@ -1061,6 +1013,78 @@ export default function PlaceDetail({
                     {cuisine.name}
                   </span>
                 ))}
+                {onTogglePlaceTag && !editing && (
+                  <div className="relative" ref={tagPopoverRef}>
+                    <button
+                      onClick={() => setShowTagPopover(!showTagPopover)}
+                      className="rounded-md border border-dashed border-[#d4c9bb] px-2 py-0.5 text-[11px] font-medium text-[var(--color-ink-muted)] transition-colors hover:border-[var(--color-amber)] hover:text-[var(--color-amber)]"
+                    >
+                      + Add tag
+                    </button>
+                    {showTagPopover && (
+                      <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-[#e0d6ca] bg-[var(--color-parchment)] p-2 shadow-lg">
+                        {tags.map((tag) => {
+                          const isActive = place.tags.some((t) => t.id === tag.id);
+                          return (
+                            <button
+                              key={tag.id}
+                              onClick={() => onTogglePlaceTag(place.id, tag.id)}
+                              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-[var(--color-cream)]"
+                            >
+                              <span
+                                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                  isActive
+                                    ? "border-[var(--color-amber)] bg-[var(--color-amber)] text-white"
+                                    : "border-[#d4c9bb]"
+                                }`}
+                              >
+                                {isActive && (
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                )}
+                              </span>
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: tag.color }}
+                              />
+                              <span className="text-[var(--color-ink)]">{tag.name}</span>
+                            </button>
+                          );
+                        })}
+                        {tags.length === 0 && (
+                          <p className="px-2 py-1 text-xs text-[var(--color-ink-muted)]">No tags yet</p>
+                        )}
+                        <div className="mt-1 border-t border-[#e0d6ca] pt-1">
+                          <form
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!newViewTagName.trim()) return;
+                              const created = await onCreateTag(newViewTagName.trim());
+                              setNewViewTagName("");
+                              await onTogglePlaceTag(place.id, created.id);
+                            }}
+                            className="flex gap-1"
+                          >
+                            <input
+                              value={newViewTagName}
+                              onChange={(e) => setNewViewTagName(e.target.value)}
+                              placeholder="New tag..."
+                              className="flex-1 rounded-md border border-[#d4c9bb] bg-white px-2 py-1 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!newViewTagName.trim()}
+                              className="rounded-md bg-[var(--color-amber)] px-2 py-1 text-xs font-semibold text-white disabled:opacity-40"
+                            >
+                              Add
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1288,8 +1312,6 @@ export default function PlaceDetail({
               <button
                 onClick={() => {
                   setPlaceType(place.placeType || "");
-                  setSelectedTagIds(place.tags.map((t) => t.id));
-                  setNewTagName("");
                   setSelectedCuisineIds(place.cuisines?.map((c) => c.id) || []);
                   setNewCuisineName("");
                   setEditing(false);
@@ -1307,8 +1329,6 @@ export default function PlaceDetail({
                   setPlaceType(place.placeType || "");
                   setNotes(place.personalNotes || "");
                   setSource(place.source || "");
-                  setSelectedTagIds(place.tags.map((t) => t.id));
-                  setNewTagName("");
                   setSelectedCuisineIds(place.cuisines?.map((c) => c.id) || []);
                   setNewCuisineName("");
                   setResProvider(place.reservationProvider || "");
