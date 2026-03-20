@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
-import { Place, Tag, City, Cuisine, List, PLACE_TYPES } from "@/lib/types";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { Place, Tag, City, Cuisine, List, PLACE_TYPES, GoogleSuggestion } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
+import AddPlaceInline from "./AddPlaceInline";
 
 import DiscoverPanel from "./DiscoverPanel";
 import type { DiscoverPin } from "./DiscoverPanel";
@@ -18,10 +19,13 @@ interface MobileBottomSheetProps {
   lists: List[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
-  onOpenAdd: () => void;
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
   onManageTags: () => void;
+  onCreateTag: (name: string) => Promise<Tag>;
+  onCityCreated: () => void;
+  onPlacePreview: (location: { lat: number; lng: number; name: string } | null) => void;
+  onPlaceSaved: () => void;
   travelTimes?: Map<number, TravelTimeBand>;
   selectedCityId: number | null;
   onCityChange: (cityId: number | null) => void;
@@ -52,10 +56,13 @@ export default function MobileBottomSheet({
   lists,
   selectedPlace,
   onSelectPlace,
-  onOpenAdd,
   filters,
   onFiltersChange,
   onManageTags,
+  onCreateTag,
+  onCityCreated,
+  onPlacePreview,
+  onPlaceSaved,
   travelTimes,
   selectedCityId,
   onCityChange,
@@ -81,6 +88,14 @@ export default function MobileBottomSheet({
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [preSortBy, setPreSortBy] = useState<SortOption>("recent");
+
+  // Unified search state
+  const [googleSuggestions, setGoogleSuggestions] = useState<GoogleSuggestion[]>([]);
+  const [searchingGoogle, setSearchingGoogle] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [addFormSuggestion, setAddFormSuggestion] = useState<GoogleSuggestion | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const googleDebounceRef = useRef<NodeJS.Timeout>(undefined);
 
   const prevIsoRef = useRef(false);
   useEffect(() => {
@@ -135,6 +150,78 @@ export default function MobileBottomSheet({
   );
   const hasDiscover = !!selectedCity?.infatuationSlug || (selectedCity?.michelinCitySlugs?.length ?? 0) > 0;
 
+  // Google Places autocomplete debounce
+  useEffect(() => {
+    if (!filters.search || filters.search.length < 2) {
+      setGoogleSuggestions([]);
+      return;
+    }
+    clearTimeout(googleDebounceRef.current);
+    googleDebounceRef.current = setTimeout(async () => {
+      setSearchingGoogle(true);
+      try {
+        const res = await fetch(
+          `/api/search?input=${encodeURIComponent(filters.search)}`
+        );
+        const data = await res.json();
+        setGoogleSuggestions(data);
+      } finally {
+        setSearchingGoogle(false);
+      }
+    }, 300);
+    return () => clearTimeout(googleDebounceRef.current);
+  }, [filters.search]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, []);
+
+  // Matching places for dropdown
+  const dropdownPlaces = useMemo(() => {
+    if (!filters.search || !dropdownOpen) return [];
+    const searchStr = filters.search.toLowerCase();
+    return (allPlaces || places)
+      .filter((p) => p.name.toLowerCase().includes(searchStr))
+      .slice(0, 5);
+  }, [allPlaces, places, filters.search, dropdownOpen]);
+
+  const showDropdown =
+    dropdownOpen &&
+    !addFormSuggestion &&
+    filters.search.length > 0 &&
+    (dropdownPlaces.length > 0 || googleSuggestions.length > 0 || searchingGoogle);
+
+  const handleSelectExistingPlace = useCallback(
+    (place: Place) => {
+      setDropdownOpen(false);
+      onFiltersChange({ ...filters, search: "" });
+      setGoogleSuggestions([]);
+      onSelectPlace(place);
+    },
+    [filters, onFiltersChange, onSelectPlace]
+  );
+
+  const handleSelectGoogleSuggestion = useCallback(
+    (suggestion: GoogleSuggestion) => {
+      setDropdownOpen(false);
+      setGoogleSuggestions([]);
+      onFiltersChange({ ...filters, search: "" });
+      setAddFormSuggestion(suggestion);
+      setExpanded(true);
+    },
+    [filters, onFiltersChange]
+  );
+
   const activeFilterCount =
     (filters.showArchived ? 1 : 0) +
     filters.tagIds.length +
@@ -180,7 +267,7 @@ export default function MobileBottomSheet({
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          {activeTab === "places" && (
+          {!addFormSuggestion && activeTab === "places" && (
             <button
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center gap-1 rounded-md bg-[var(--color-sidebar-surface)] px-2 py-1 text-xs text-[var(--color-sidebar-muted)]"
@@ -194,27 +281,100 @@ export default function MobileBottomSheet({
             </button>
           )}
         </div>
-        <button
-          onClick={onOpenAdd}
-          className="flex items-center gap-1 rounded-md bg-[var(--color-amber)] px-3 py-1.5 text-xs font-semibold text-white"
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add
-        </button>
       </div>
 
-      {/* Tab bar */}
+      {/* Search + dropdown */}
+      <div className="relative px-4 pb-2" ref={searchContainerRef}>
+        <input
+          value={filters.search}
+          onChange={(e) => {
+            onFiltersChange({ ...filters, search: e.target.value });
+            setDropdownOpen(true);
+            if (!expanded) setExpanded(true);
+          }}
+          onFocus={() => {
+            if (filters.search) setDropdownOpen(true);
+            if (!expanded) setExpanded(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setDropdownOpen(false);
+          }}
+          className="w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-3 py-1.5 text-base md:text-sm text-[var(--color-sidebar-text)] placeholder-[var(--color-sidebar-muted)] focus:border-[var(--color-amber)] focus:outline-none"
+          placeholder="Search or add places..."
+        />
+
+        {/* Unified search dropdown */}
+        {showDropdown && (
+          <div className="absolute left-4 right-4 z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-bg)] shadow-lg sidebar-scroll">
+            {/* Your Places section */}
+            {dropdownPlaces.length > 0 && (
+              <div className="border-b border-[var(--color-sidebar-border)]">
+                <p className="px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                  Your Places
+                </p>
+                {dropdownPlaces.map((place) => (
+                  <button
+                    key={place.id}
+                    onClick={() => handleSelectExistingPlace(place)}
+                    className="w-full px-3 py-2 text-left transition-colors hover:bg-[var(--color-sidebar-surface)]"
+                  >
+                    <p className="text-sm font-medium text-[var(--color-sidebar-text)]">
+                      {place.name}
+                    </p>
+                    {place.neighborhood && (
+                      <p className="text-xs text-[var(--color-sidebar-muted)]">
+                        {place.neighborhood}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Add New section */}
+            <div>
+              <p className="px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                Add New
+              </p>
+              {searchingGoogle && googleSuggestions.length === 0 && (
+                <p className="px-3 py-2 text-xs text-[var(--color-sidebar-muted)] animate-warm-pulse">
+                  Searching Google Places...
+                </p>
+              )}
+              {googleSuggestions.map((s) => (
+                <button
+                  key={s.placePrediction.placeId}
+                  onClick={() => handleSelectGoogleSuggestion(s)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--color-sidebar-surface)]"
+                >
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--color-amber)]">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-[var(--color-sidebar-text)]">
+                      {s.placePrediction.structuredFormat.mainText.text}
+                    </p>
+                    <p className="truncate text-xs text-[var(--color-sidebar-muted)]">
+                      {s.placePrediction.structuredFormat.secondaryText.text}
+                    </p>
+                  </div>
+                </button>
+              ))}
+              {!searchingGoogle && googleSuggestions.length === 0 && filters.search.length >= 2 && (
+                <p className="px-3 py-2 text-xs text-[var(--color-sidebar-muted)]">
+                  No Google results
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Tab bar — hidden when inline add form is active */}
+      {!addFormSuggestion && (
       <div className="flex gap-4 px-4 pb-2">
           <button
             onClick={() => onActiveTabChange("places")}
@@ -249,11 +409,29 @@ export default function MobileBottomSheet({
             Lists
           </button>
         </div>
+      )}
 
       {/* Content area — relative container for drawer overlay */}
       <div className="relative flex-1 overflow-hidden">
+        {/* Inline Add Place form */}
+        {addFormSuggestion && (
+          <AddPlaceInline
+            suggestion={addFormSuggestion}
+            tags={tags}
+            cities={cities}
+            existingPlaces={allPlaces || places}
+            onCreateTag={onCreateTag}
+            onCityCreated={onCityCreated}
+            onPlacePreview={onPlacePreview}
+            onSave={() => {
+              setAddFormSuggestion(null);
+              onPlaceSaved();
+            }}
+            onCancel={() => setAddFormSuggestion(null)}
+          />
+        )}
         {/* Discover Panel */}
-        {activeTab === "discover" && hasDiscover && selectedCity && onDiscoverPinsChange && (
+        {!addFormSuggestion && activeTab === "discover" && hasDiscover && selectedCity && onDiscoverPinsChange && (
           <div className="h-full overflow-y-auto py-2 sidebar-scroll">
             <DiscoverPanel
               infatuationSlug={selectedCity.infatuationSlug}
@@ -271,7 +449,7 @@ export default function MobileBottomSheet({
         )}
 
         {/* Lists Tab */}
-        {activeTab === "lists" && onCreateList && onRenameList && onDeleteList && onBuildingListIdChange && onTogglePlaceInList && (
+        {!addFormSuggestion && activeTab === "lists" && onCreateList && onRenameList && onDeleteList && onBuildingListIdChange && onTogglePlaceInList && (
           <div className="h-full overflow-y-auto py-2 sidebar-scroll">
             <ListsPanel
               lists={lists}
@@ -291,7 +469,7 @@ export default function MobileBottomSheet({
         )}
 
         {/* Places Tab */}
-        {activeTab === "places" && (
+        {!addFormSuggestion && activeTab === "places" && (
           <div className="flex h-full flex-col">
             {/* Build mode banner */}
             {buildingListId && onBuildingListIdChange && (
@@ -317,18 +495,6 @@ export default function MobileBottomSheet({
                 </div>
               </div>
             )}
-
-            {/* Search */}
-            <div className="px-4 py-2">
-              <input
-                value={filters.search}
-                onChange={(e) =>
-                  onFiltersChange({ ...filters, search: e.target.value })
-                }
-                className="w-full rounded-md border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] px-3 py-1.5 text-sm text-[var(--color-sidebar-text)] placeholder-[var(--color-sidebar-muted)] focus:border-[var(--color-amber)] focus:outline-none"
-                placeholder="Search places..."
-              />
-            </div>
 
             {/* Sort + Place list */}
             <div className="flex-1 overflow-y-auto px-4 pb-4 sidebar-scroll">
@@ -371,7 +537,7 @@ export default function MobileBottomSheet({
         )}
 
         {/* Filter drawer overlay */}
-        {activeTab === "places" && (
+        {!addFormSuggestion && activeTab === "places" && (
           <>
             {/* Backdrop */}
             <div

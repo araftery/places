@@ -504,7 +504,7 @@ export default function Map({
         </Popup>
       )}
 
-      {/* Preview pin for unsaved place from AddPlaceModal */}
+      {/* Preview pin for unsaved place from inline add form */}
       {previewPin && (
         <Marker
           longitude={previewPin.lng}

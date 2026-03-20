@@ -8,7 +8,6 @@ import Sidebar, {
   applyFilters,
 } from "@/components/Sidebar";
 import PlaceDetail from "@/components/PlaceDetail";
-import AddPlaceModal from "@/components/AddPlaceModal";
 import ManageTagsModal from "@/components/ManageTagsModal";
 import IsochroneControl, {
   IsochroneSettings,
@@ -33,7 +32,6 @@ export default function Home() {
   const [cities, setCities] = useState<City[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showDetail, setShowDetail] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showManageTags, setShowManageTags] = useState(false);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
@@ -52,7 +50,7 @@ export default function Home() {
   }, []);
   const [loading, setLoading] = useState(true);
 
-  // Preview pin from AddPlaceModal
+  // Preview pin from inline add form
   const [previewPin, setPreviewPin] = useState<{ lat: number; lng: number; name: string } | null>(null);
   // Discover pins from Infatuation guides
   const [discoverPins, setDiscoverPins] = useState<{ lat: number; lng: number; name: string; rating: number | null; alreadyInList: boolean; matchedPlaceId: number | null }[]>([]);
@@ -547,10 +545,13 @@ export default function Home() {
           lists={lists}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
-          onOpenAdd={() => setShowAddModal(true)}
           filters={filters}
           onFiltersChange={setFilters}
           onManageTags={() => setShowManageTags(true)}
+          onCreateTag={handleCreateTag}
+          onCityCreated={fetchCities}
+          onPlacePreview={handlePlacePreview}
+          onPlaceSaved={fetchPlaces}
           travelTimes={travelTimes}
           selectedCityId={selectedCityId}
           onCityChange={handleCityChange}
@@ -636,24 +637,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Mobile: Add FAB */}
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="absolute bottom-6 right-6 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-amber)] text-xl text-white shadow-lg transition-transform hover:scale-105 hover:bg-[var(--color-amber-light)] active:scale-95 md:hidden"
-        >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
       </div>
 
       {/* Place Detail Slide-over */}
@@ -688,10 +671,13 @@ export default function Home() {
           lists={lists}
           selectedPlace={selectedPlace}
           onSelectPlace={handleSelectPlace}
-          onOpenAdd={() => setShowAddModal(true)}
           filters={filters}
           onFiltersChange={setFilters}
           onManageTags={() => setShowManageTags(true)}
+          onCreateTag={handleCreateTag}
+          onCityCreated={fetchCities}
+          onPlacePreview={handlePlacePreview}
+          onPlaceSaved={fetchPlaces}
           travelTimes={travelTimes}
           selectedCityId={selectedCityId}
           onCityChange={handleCityChange}
@@ -739,19 +725,6 @@ export default function Home() {
           />
         </div>
       )}
-
-      {/* Add Place Modal */}
-      <AddPlaceModal
-        open={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSave={fetchPlaces}
-        tags={tags}
-        cities={cities}
-        existingPlaces={places}
-        onCreateTag={handleCreateTag}
-        onCityCreated={fetchCities}
-        onPlacePreview={handlePlacePreview}
-      />
 
       {/* Manage Tags Modal */}
       <ManageTagsModal

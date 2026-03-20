@@ -181,6 +181,36 @@ export const CATEGORY_STROKE_COLORS: Record<PlaceTypeCategory, string> = {
   other: "#736b62",
 };
 
+export interface GoogleSuggestion {
+  placePrediction: {
+    placeId: string;
+    text: { text: string };
+    structuredFormat: {
+      mainText: { text: string };
+      secondaryText: { text: string };
+    };
+  };
+}
+
+export interface GooglePlaceDetails {
+  googlePlaceId: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  websiteUrl: string | null;
+  phone: string | null;
+  priceRange: number | null;
+  hoursJson: unknown;
+  googleRating: number | null;
+  googleRatingCount: number | null;
+  primaryType: string | null;
+  types: string[];
+  neighborhood: string | null;
+  city: string | null;
+  googlePlaceType: string | null;
+}
+
 export const GOOGLE_TO_DEFAULT_PLACE_TYPE: Record<string, string> = {
   restaurant: "casual_dining",
   bar: "dive_bar",

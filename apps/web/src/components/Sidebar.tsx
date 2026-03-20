@@ -1,12 +1,13 @@
 "use client";
 
-import { Place, Tag, City, Cuisine, List, PLACE_TYPES } from "@/lib/types";
+import { Place, Tag, City, Cuisine, List, PLACE_TYPES, GoogleSuggestion } from "@/lib/types";
 import PlaceCard from "./PlaceCard";
+import AddPlaceInline from "./AddPlaceInline";
 
 import DiscoverPanel from "./DiscoverPanel";
 import type { DiscoverPin } from "./DiscoverPanel";
 import ListsPanel from "./ListsPanel";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import type { TravelTimeBand } from "@/lib/geo";
 
 export type SortOption = "recent" | "rating" | "name" | "nearest";
@@ -19,10 +20,13 @@ interface SidebarProps {
   lists: List[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
-  onOpenAdd: () => void;
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
   onManageTags: () => void;
+  onCreateTag: (name: string) => Promise<Tag>;
+  onCityCreated: () => void;
+  onPlacePreview: (location: { lat: number; lng: number; name: string } | null) => void;
+  onPlaceSaved: () => void;
   travelTimes?: Map<number, TravelTimeBand>;
   selectedCityId: number | null;
   onCityChange: (cityId: number | null) => void;
@@ -226,10 +230,13 @@ export default function Sidebar({
   lists,
   selectedPlace,
   onSelectPlace,
-  onOpenAdd,
   filters,
   onFiltersChange,
   onManageTags,
+  onCreateTag,
+  onCityCreated,
+  onPlacePreview,
+  onPlaceSaved,
   travelTimes,
   selectedCityId,
   onCityChange,
@@ -255,6 +262,14 @@ export default function Sidebar({
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [preSortBy, setPreSortBy] = useState<SortOption>("recent");
 
+  // Unified search state
+  const [googleSuggestions, setGoogleSuggestions] = useState<GoogleSuggestion[]>([]);
+  const [searchingGoogle, setSearchingGoogle] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [addFormSuggestion, setAddFormSuggestion] = useState<GoogleSuggestion | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const googleDebounceRef = useRef<NodeJS.Timeout>(undefined);
+
   // Auto-switch to "nearest" when isochrone activates, revert when it deactivates
   const prevIsoRef = useRef(false);
   const placeCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -277,6 +292,77 @@ export default function Sidebar({
     }
     prevIsoRef.current = !!isochroneActive;
   }, [isochroneActive]);
+
+  // Google Places autocomplete debounce
+  useEffect(() => {
+    if (!filters.search || filters.search.length < 2) {
+      setGoogleSuggestions([]);
+      return;
+    }
+    clearTimeout(googleDebounceRef.current);
+    googleDebounceRef.current = setTimeout(async () => {
+      setSearchingGoogle(true);
+      try {
+        const res = await fetch(
+          `/api/search?input=${encodeURIComponent(filters.search)}`
+        );
+        const data = await res.json();
+        setGoogleSuggestions(data);
+      } finally {
+        setSearchingGoogle(false);
+      }
+    }, 300);
+    return () => clearTimeout(googleDebounceRef.current);
+  }, [filters.search]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, []);
+
+  // Matching places for dropdown
+  const dropdownPlaces = useMemo(() => {
+    if (!filters.search || !dropdownOpen) return [];
+    const searchStr = filters.search.toLowerCase();
+    return (allPlaces || places)
+      .filter((p) => p.name.toLowerCase().includes(searchStr))
+      .slice(0, 5);
+  }, [allPlaces, places, filters.search, dropdownOpen]);
+
+  const showDropdown =
+    dropdownOpen &&
+    !addFormSuggestion &&
+    filters.search.length > 0 &&
+    (dropdownPlaces.length > 0 || googleSuggestions.length > 0 || searchingGoogle);
+
+  const handleSelectExistingPlace = useCallback(
+    (place: Place) => {
+      setDropdownOpen(false);
+      onFiltersChange({ ...filters, search: "" });
+      setGoogleSuggestions([]);
+      onSelectPlace(place);
+    },
+    [filters, onFiltersChange, onSelectPlace]
+  );
+
+  const handleSelectGoogleSuggestion = useCallback(
+    (suggestion: GoogleSuggestion) => {
+      setDropdownOpen(false);
+      setGoogleSuggestions([]);
+      onFiltersChange({ ...filters, search: "" });
+      setAddFormSuggestion(suggestion);
+    },
+    [filters, onFiltersChange]
+  );
 
   const filteredPlaces = useMemo(
     () => applyFilters(places, filters),
@@ -345,45 +431,25 @@ export default function Sidebar({
     <div className="relative flex h-full flex-col bg-[var(--color-sidebar-bg)] grain">
       {/* Header */}
       <div className="relative z-10 border-b border-[var(--color-sidebar-border)] px-5 pb-4 pt-5">
-        <div className="flex items-center justify-between">
-          <select
-            value={selectedCityId ?? ""}
-            onChange={(e) => onCityChange(e.target.value ? parseInt(e.target.value) : null)}
-            className="appearance-none bg-transparent text-xl tracking-tight text-[var(--color-sidebar-text)] cursor-pointer pr-6 focus:outline-none"
-            style={{
-              fontFamily: "var(--font-libre-baskerville)",
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238a7e72' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 0 center",
-            }}
-          >
-            <option value="">All Cities</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <button
-            onClick={onOpenAdd}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-amber)] px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-amber-light)]"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add
-          </button>
-        </div>
+        <select
+          value={selectedCityId ?? ""}
+          onChange={(e) => onCityChange(e.target.value ? parseInt(e.target.value) : null)}
+          className="appearance-none bg-transparent text-xl tracking-tight text-[var(--color-sidebar-text)] cursor-pointer pr-6 focus:outline-none"
+          style={{
+            fontFamily: "var(--font-libre-baskerville)",
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238a7e72' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "right 0 center",
+          }}
+        >
+          <option value="">All Cities</option>
+          {cities.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
 
-        {/* Search */}
-        <div className="relative mt-3">
+        {/* Search + dropdown */}
+        <div className="relative mt-3" ref={searchContainerRef}>
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-sidebar-muted)]"
             width="15"
@@ -399,84 +465,181 @@ export default function Sidebar({
           </svg>
           <input
             value={filters.search}
-            onChange={(e) =>
-              onFiltersChange({ ...filters, search: e.target.value })
-            }
-            className="block w-full rounded-lg border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] py-2 pl-9 pr-3 text-sm text-[var(--color-sidebar-text)] placeholder-[var(--color-sidebar-muted)] transition-colors focus:border-[var(--color-amber)] focus:outline-none"
-            placeholder="Search places..."
+            onChange={(e) => {
+              onFiltersChange({ ...filters, search: e.target.value });
+              setDropdownOpen(true);
+            }}
+            onFocus={() => {
+              if (filters.search) setDropdownOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setDropdownOpen(false);
+            }}
+            className="block w-full rounded-lg border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-surface)] py-2 pl-9 pr-3 text-base md:text-sm text-[var(--color-sidebar-text)] placeholder-[var(--color-sidebar-muted)] transition-colors focus:border-[var(--color-amber)] focus:outline-none"
+            placeholder="Search or add places..."
           />
+
+          {/* Unified search dropdown */}
+          {showDropdown && (
+            <div className="absolute left-0 right-0 z-30 mt-1 max-h-80 overflow-y-auto rounded-lg border border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-bg)] shadow-lg sidebar-scroll">
+              {/* Your Places section */}
+              {dropdownPlaces.length > 0 && (
+                <div className="border-b border-[var(--color-sidebar-border)]">
+                  <p className="px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                    Your Places
+                  </p>
+                  {dropdownPlaces.map((place) => (
+                    <button
+                      key={place.id}
+                      onClick={() => handleSelectExistingPlace(place)}
+                      className="w-full px-3 py-2 text-left transition-colors hover:bg-[var(--color-sidebar-surface)]"
+                    >
+                      <p className="text-sm font-medium text-[var(--color-sidebar-text)]">
+                        {place.name}
+                      </p>
+                      {place.neighborhood && (
+                        <p className="text-xs text-[var(--color-sidebar-muted)]">
+                          {place.neighborhood}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Add New section */}
+              <div>
+                <p className="px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-muted)]">
+                  Add New
+                </p>
+                {searchingGoogle && googleSuggestions.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-[var(--color-sidebar-muted)] animate-warm-pulse">
+                    Searching Google Places...
+                  </p>
+                )}
+                {googleSuggestions.map((s) => (
+                  <button
+                    key={s.placePrediction.placeId}
+                    onClick={() => handleSelectGoogleSuggestion(s)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--color-sidebar-surface)]"
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--color-amber)]">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-[var(--color-sidebar-text)]">
+                        {s.placePrediction.structuredFormat.mainText.text}
+                      </p>
+                      <p className="truncate text-xs text-[var(--color-sidebar-muted)]">
+                        {s.placePrediction.structuredFormat.secondaryText.text}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+                {!searchingGoogle && googleSuggestions.length === 0 && filters.search.length >= 2 && (
+                  <p className="px-3 py-2 text-xs text-[var(--color-sidebar-muted)]">
+                    No Google results
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Tab bar */}
-        <div className="mt-3 flex gap-4 border-b border-[var(--color-sidebar-border)]">
-            <button
-              onClick={() => onActiveTabChange("places")}
-              className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                activeTab === "places"
-                  ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
-                  : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-              }`}
-            >
-              My Places
-            </button>
-            {hasDiscover && (
+        {/* Tab bar — hidden when inline add form is active */}
+        {!addFormSuggestion && (
+          <>
+            <div className="mt-3 flex gap-4 border-b border-[var(--color-sidebar-border)]">
               <button
-                onClick={() => onActiveTabChange("discover")}
+                onClick={() => onActiveTabChange("places")}
                 className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                  activeTab === "discover"
+                  activeTab === "places"
                     ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
                     : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
                 }`}
               >
-                Discover
+                My Places
               </button>
-            )}
-            <button
-              onClick={() => onActiveTabChange("lists")}
-              className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                activeTab === "lists"
-                  ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
-                  : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
-              }`}
-            >
-              Lists
-            </button>
-          </div>
-
-        {activeTab === "places" && (
-          <div className="mt-3 flex items-center gap-3">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-1.5 text-sm text-[var(--color-sidebar-muted)] transition-colors hover:text-[var(--color-sidebar-text)]"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <line x1="4" y1="6" x2="20" y2="6" />
-                <line x1="8" y1="12" x2="20" y2="12" />
-                <line x1="12" y1="18" x2="20" y2="18" />
-              </svg>
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="rounded-full bg-[var(--color-amber)] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                  {activeFilterCount}
-                </span>
+              {hasDiscover && (
+                <button
+                  onClick={() => onActiveTabChange("discover")}
+                  className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                    activeTab === "discover"
+                      ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
+                      : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                  }`}
+                >
+                  Discover
+                </button>
               )}
-            </button>
-          </div>
+              <button
+                onClick={() => onActiveTabChange("lists")}
+                className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                  activeTab === "lists"
+                    ? "border-b-2 border-[var(--color-amber)] text-[var(--color-amber)]"
+                    : "text-[var(--color-sidebar-muted)] hover:text-[var(--color-sidebar-text)]"
+                }`}
+              >
+                Lists
+              </button>
+            </div>
+
+            {activeTab === "places" && (
+              <div className="mt-3 flex items-center gap-3">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center gap-1.5 text-sm text-[var(--color-sidebar-muted)] transition-colors hover:text-[var(--color-sidebar-text)]"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <line x1="4" y1="6" x2="20" y2="6" />
+                    <line x1="8" y1="12" x2="20" y2="12" />
+                    <line x1="12" y1="18" x2="20" y2="18" />
+                  </svg>
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="rounded-full bg-[var(--color-amber)] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Content area — relative container for drawer overlay */}
       <div className="relative flex-1 overflow-hidden">
+        {/* Inline Add Place form */}
+        {addFormSuggestion && (
+          <AddPlaceInline
+            suggestion={addFormSuggestion}
+            tags={tags}
+            cities={cities}
+            existingPlaces={allPlaces || places}
+            onCreateTag={onCreateTag}
+            onCityCreated={onCityCreated}
+            onPlacePreview={onPlacePreview}
+            onSave={() => {
+              setAddFormSuggestion(null);
+              onPlaceSaved();
+            }}
+            onCancel={() => setAddFormSuggestion(null)}
+          />
+        )}
         {/* Discover Tab */}
-        {activeTab === "discover" && hasDiscover && selectedCity && onDiscoverPinsChange && (
+        {!addFormSuggestion && activeTab === "discover" && hasDiscover && selectedCity && onDiscoverPinsChange && (
           <div className="h-full overflow-y-auto py-3 sidebar-scroll">
             <DiscoverPanel
               infatuationSlug={selectedCity.infatuationSlug}
@@ -494,7 +657,7 @@ export default function Sidebar({
         )}
 
         {/* Lists Tab */}
-        {activeTab === "lists" && onCreateList && onRenameList && onDeleteList && onBuildingListIdChange && onTogglePlaceInList && (
+        {!addFormSuggestion && activeTab === "lists" && onCreateList && onRenameList && onDeleteList && onBuildingListIdChange && onTogglePlaceInList && (
           <div className="h-full overflow-y-auto py-3 sidebar-scroll">
             <ListsPanel
               lists={lists}
@@ -514,7 +677,7 @@ export default function Sidebar({
         )}
 
         {/* Places Tab: build mode banner + place list */}
-        {activeTab === "places" && (
+        {!addFormSuggestion && activeTab === "places" && (
           <div className="flex h-full flex-col">
             {/* Build mode banner */}
             {buildingListId && onBuildingListIdChange && (
@@ -596,7 +759,7 @@ export default function Sidebar({
         )}
 
         {/* Filter drawer overlay */}
-        {activeTab === "places" && (
+        {!addFormSuggestion && activeTab === "places" && (
           <>
             {/* Backdrop */}
             <div
