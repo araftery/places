@@ -168,8 +168,13 @@ export default function Home() {
     const geolocate = () => {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const closest = findClosestCity(pos.coords.latitude, pos.coords.longitude);
-          if (closest) selectCity(closest);
+          const { latitude, longitude } = pos.coords;
+          const closest = findClosestCity(latitude, longitude);
+          if (closest) {
+            setSelectedCityId(closest.id);
+            // Fly to user's actual location, not city center
+            setFlyTo({ lat: latitude, lng: longitude, zoom: 13 });
+          }
         },
         () => {} // Geolocation denied — keep New York
       );
